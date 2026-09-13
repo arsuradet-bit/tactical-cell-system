@@ -1,3 +1,9 @@
+import streamlit as st
+
+# แสดงโลโก้หน่วยงานขนาดพอดี (จัดไว้ตรงกลาง)
+col1, col2, col3 = st.columns([2, 1, 2])
+with col2:
+    st.image("logo.png", width=120)  # ปรับขนาดความกว้างได้ตามต้องการครับ
 import pandas as pd
 import streamlit as st
 from sqlalchemy import create_engine, text
