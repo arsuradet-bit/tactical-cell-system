@@ -10,7 +10,7 @@ st.set_page_config(
 )
 
 # --- ระบบความปลอดภัย: ตรวจสอบรหัสผ่านก่อนเข้าใช้งาน ---
-TACTICAL_PASSWORD = "ncid"
+TACTICAL_PASSWORD = "TAC2026"
 
 if "authenticated" not in st.session_state:
     st.session_state.authenticated = False
@@ -36,10 +36,9 @@ if not st.session_state.authenticated:
     st.stop()
 
 # ==========================================
-# ส่วนด้านล่างนี้จะทำงานเฉพาะเมื่อใส่รหัสผ่านถูกต้องแล้วเท่านั้น
+# ส่วนล่างนี้จะทำงานเฉพาะเมื่อใส่รหัสผ่านถูกต้องแล้ว
 # ==========================================
 
-# --- แสดงโลโก้หน่วยงานขนาดพอดี (จัดไว้ตรงกลาง) ---
 col1, col2, col3 = st.columns([2, 1, 2])
 with col2:
     try:
@@ -54,81 +53,57 @@ DB_HOST = "34.15.139.132"
 DB_PORT = "5432"
 DB_NAME = "postgres"
 
-# Custom CSS ธีม Detective Blue และการจัด Layout
+# CSS แก้ไขใหม่: เน้นความสว่างของตัวหนังสือและการจัดตำแหน่ง
 st.markdown(
     """
     <style>
     /* พื้นหลังหลักของเว็บ */
-    .stApp { 
-        background-color: #0b1426 !important; 
-        color: #e2e8f0; 
-    }
+    .stApp { background-color: #0b1426 !important; color: #e2e8f0; }
     
     /* กล่อง Header หลัก */
     .tactical-header {
         background: linear-gradient(90deg, #0f172a 0%, #1e293b 100%);
-        padding: 20px; 
-        border-radius: 8px;
-        text-align: center; 
-        border-left: 5px solid #3b82f6;
-        border-right: 5px solid #3b82f6;
-        margin-bottom: 25px;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+        padding: 20px; border-radius: 8px; text-align: center; 
+        border-left: 5px solid #3b82f6; border-right: 5px solid #3b82f6;
+        margin-bottom: 25px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
     }
     
-    /* สีของปุ่มกดหลัก (ปุ่ม SCAN และ อัปโหลด) */
-    .stButton > button[kind="primary"] {
-        background-color: #1d4ed8 !important; /* สีน้ำเงินเข้ม */
+    /* บังคับสีปุ่มกดทั้งหมดให้เป็นสีน้ำเงิน Tactical Blue (ลบสีแดง) */
+    .stButton > button, [data-testid="stFormSubmitButton"] > button {
+        background-color: #2563eb !important;
         color: white !important;
-        border: 1px solid #2563eb !important;
-        border-radius: 6px !important;
+        border: none !important;
         font-weight: bold !important;
-        height: 42px !important; /* ล็อกความสูงปุ่มให้เท่ากับช่องกรอกข้อมูล */
+        height: 40px !important;
     }
-    .stButton > button[kind="primary"]:hover {
-        background-color: #2563eb !important; /* สีสว่างขึ้นเมื่อชี้เมาส์ */
-        box-shadow: 0 0 10px rgba(59, 130, 246, 0.5);
+    .stButton > button:hover, [data-testid="stFormSubmitButton"] > button:hover {
+        background-color: #1d4ed8 !important; /* เข้มขึ้นเมื่อชี้เมาส์ */
     }
     
-    /* สีของปุ่มกดรอง (Logout) */
-    .stButton > button[kind="secondary"] {
+    /* แก้ไขปัญหาช่องกรอกข้อมูลมืด มองไม่เห็น */
+    input[type="text"], input[type="password"] {
+        color: #ffffff !important; /* สีตัวหนังสือตอนพิมพ์ (ขาว) */
+        background-color: #1e293b !important; /* พื้นหลังช่องกรอก */
+        border: 1px solid #3b82f6 !important;
+    }
+    input::placeholder {
+        color: #94a3b8 !important; /* สีข้อความจางๆ (Placeholder) ให้สว่างขึ้น */
+        opacity: 1 !important;
+    }
+    
+    /* ปรับแต่ง Dropdown Selectbox */
+    div[data-baseweb="select"] > div {
         background-color: #1e293b !important;
-        color: #e2e8f0 !important;
-        border: 1px solid #334155 !important;
+        color: white !important;
+        border: 1px solid #3b82f6 !important;
     }
     
-    /* ปรับขนาดกล่องอัปโหลดไฟล์ให้บางลงและแนบเนียนขึ้น */
+    /* ปรับขนาดกล่องอัปโหลดไฟล์ให้พอดีกับช่องอื่นๆ */
     [data-testid="stFileUploadDropzone"] {
         background-color: #1e293b !important;
         border: 1px dashed #3b82f6 !important;
-        color: #e2e8f0 !important;
-        min-height: 42px !important; /* บีบความสูงให้เท่าปุ่ม */
-        padding: 5px !important;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-    }
-    
-    /* สีช่องกรอกข้อมูลและ Selectbox */
-    .stTextInput input, .stSelectbox div[data-baseweb="select"] {
-        background-color: #1e293b !important;
-        color: white !important;
-        border: 1px solid #334155 !important;
-        border-radius: 6px !important;
-    }
-    
-    /* สีตัวอักษรหัวข้อและ Label */
-    label, .stMarkdown p { color: #94a3b8 !important; font-weight: 500 !important; }
-    h2, h3, h4 { color: #f8fafc !important; }
-    
-    /* กล่องแจ้งเตือน */
-    .tactical-alert-success {
-        background-color: #064e3b; color: #34d399; padding: 12px; border-radius: 6px;
-        border: 1px solid #059669; font-weight: bold; margin-bottom: 15px;
-    }
-    .tactical-alert-error {
-        background-color: #7f1d1d; color: #fca5a5; padding: 12px; border-radius: 6px;
-        border: 1px solid #b91c1c; font-weight: bold; margin-bottom: 15px;
+        padding: 0px 10px !important;
+        min-height: 40px !important;
     }
     </style>
 """,
@@ -154,23 +129,18 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# --- ปุ่มออกจากระบบ (Logout) ---
 col_top_btn1, col_top_btn2 = st.columns([10, 1])
 with col_top_btn2:
     if st.button("🚪 Logout"):
         st.session_state.authenticated = False
         st.rerun()
 
-# --- ฟังก์ชันเชื่อมต่อฐานข้อมูล ---
 @st.cache_resource
 def get_engine():
     return create_engine(
         f"postgresql://{DB_USER}:{DB_PASS}@{DB_HOST}:{DB_PORT}/{DB_NAME}",
-        pool_size=10,
-        max_overflow=20,
-        pool_recycle=3600
+        pool_size=10, max_overflow=20, pool_recycle=3600
     )
-
 engine = get_engine()
 
 # ==========================================
@@ -186,27 +156,15 @@ network_mapping = {
     "⚪ ไม่ระบุ (ใช้ข้อมูลเดิมในไฟล์)": {"name": None, "code": None}
 }
 
-# จัด Layout 3 ช่องให้สัมพันธ์กัน (ปรับสมดุลช่อง)
-col_net, col_file, col_btn = st.columns([1.2, 1.8, 1])
+# ใช้ vertical_alignment="bottom" เพื่อให้กล่องและปุ่มถูกดึงลงมาขอบล่างเท่ากันเป๊ะ
+col_net, col_file, col_btn = st.columns([1.2, 1.8, 1.2], vertical_alignment="bottom")
 
 with col_net:
-    selected_network = st.selectbox(
-        "เครือข่าย", 
-        options=list(network_mapping.keys()), 
-        label_visibility="collapsed"
-    )
-
+    selected_network = st.selectbox("เครือข่าย", options=list(network_mapping.keys()), label_visibility="collapsed")
 with col_file:
-    uploaded_file = st.file_uploader(
-        "เลือกไฟล์ CSV", 
-        type=["csv"], 
-        label_visibility="collapsed"
-    )
-
+    uploaded_file = st.file_uploader("เลือกไฟล์ CSV", type=["csv"], label_visibility="collapsed")
 with col_btn:
-    # เพิ่มระยะขอบบนนิดหน่อยให้ปุ่มตรงกับกล่องพอดีเป๊ะ
-    st.markdown("<div style='margin-top: 1px;'></div>", unsafe_allow_html=True)
-    upload_clicked = st.button("⬆️ อัปโหลดเข้าฐานข้อมูล", use_container_width=True, type="primary")
+    upload_clicked = st.button("⬆️ อัปโหลดเข้าฐานข้อมูล", use_container_width=True)
 
 if upload_clicked:
     if uploaded_file is not None:
@@ -235,8 +193,8 @@ st.markdown("---")
 # ==========================================
 st.markdown("#### 🔍 2. ค้นหาพิกัดและแกะรอยเป้าหมาย")
 with st.form(key="search_form"):
-    # แบ่งช่องเป็น 1:1:1:1 เท่าๆ กันทุกช่อง
-    col_s1, col_s2, col_s3, col_s4 = st.columns([1, 1, 1, 1])
+    # ใช้ vertical_alignment="bottom" จัดให้ปุ่ม SCAN อยู่ระดับเดียวกับช่องพิมพ์
+    col_s1, col_s2, col_s3, col_s4 = st.columns([1, 1, 1, 1], vertical_alignment="bottom")
     
     with col_s1:
         cell_input = st.text_input("CELL (XCI)", placeholder="ระบุรหัส CELL...")
@@ -245,11 +203,8 @@ with st.form(key="search_form"):
     with col_s3:
         ncid_input = st.text_input("NCID", placeholder="ระบุรหัส NCID...")
     with col_s4:
-        # ใช้ CSS ดันปุ่มลงมา 28px เพื่อให้ปุ่ม SCAN อยู่ในระนาบเดียวกับช่องกรอกข้อมูลพอดี
-        st.markdown("<div style='margin-top: 28px;'></div>", unsafe_allow_html=True)
-        scan_clicked = st.form_submit_button("SCAN 🔍", use_container_width=True, type="primary")
+        scan_clicked = st.form_submit_button("SCAN 🔍", use_container_width=True)
 
-# เมื่อมีการกดปุ่ม SCAN
 if scan_clicked:
     if not cell_input and not lac_input and not ncid_input:
         st.session_state.search_message = "⚠️ กรุณากรอกข้อมูลสำหรับค้นหาอย่างน้อย 1 ช่อง"
@@ -291,18 +246,16 @@ if scan_clicked:
                 st.session_state.alert_type = "error"
                 st.session_state.target_df = pd.DataFrame()
 
-# --- แสดงผลข้อความแจ้งเตือน ---
 if st.session_state.search_message:
     if st.session_state.alert_type == "success":
-        st.markdown(f'<div class="tactical-alert-success">{st.session_state.search_message}</div>', unsafe_allow_html=True)
+        st.markdown(f'<div style="background-color: #064e3b; color: #34d399; padding: 12px; border-radius: 6px; border: 1px solid #059669; font-weight: bold; margin-bottom: 15px;">{st.session_state.search_message}</div>', unsafe_allow_html=True)
     else:
-        st.markdown(f'<div class="tactical-alert-error">{st.session_state.search_message}</div>', unsafe_allow_html=True)
+        st.markdown(f'<div style="background-color: #7f1d1d; color: #fca5a5; padding: 12px; border-radius: 6px; border: 1px solid #b91c1c; font-weight: bold; margin-bottom: 15px;">{st.session_state.search_message}</div>', unsafe_allow_html=True)
 
 # --- ส่วนแสดงผลแผนที่ (OpenStreetMap) ---
 st.subheader("🗺️ แผนที่แสดงพิกัดยุทธวิธี (Tactical Map)")
 
 target_df = st.session_state.target_df
-
 lat_center, lon_center = 7.0123, 100.4911
 
 if not target_df.empty and "lat" in target_df.columns and "lon" in target_df.columns:
@@ -311,11 +264,7 @@ if not target_df.empty and "lat" in target_df.columns and "lon" in target_df.col
         lat_center = float(valid_target["lat"].iloc[0])
         lon_center = float(valid_target["lon"].iloc[0])
 
-m = folium.Map(
-    location=[lat_center, lon_center],
-    zoom_start=12,
-    tiles="OpenStreetMap"
-)
+m = folium.Map(location=[lat_center, lon_center], zoom_start=12, tiles="OpenStreetMap")
 
 if not target_df.empty and "lat" in target_df.columns and "lon" in target_df.columns:
     map_df = target_df.dropna(subset=["lat", "lon"]).copy()
@@ -328,11 +277,7 @@ if not target_df.empty and "lat" in target_df.columns and "lon" in target_df.col
         
         folium.CircleMarker(
             location=[row["lat"], row["lon"]],
-            radius=6,
-            color="#38bdf8", # เปลี่ยนสีจุดบนแผนที่เป็นสีฟ้า (Cyber Blue)
-            fill=True,
-            fill_color="#38bdf8",
-            fill_opacity=0.9,
+            radius=6, color="#38bdf8", fill=True, fill_color="#38bdf8", fill_opacity=0.9,
             popup=f"CELL: {row.get('xci', 'N/A')} | LAC: {row.get('lac/tac', 'N/A')} | NCID: {row.get('ncid', row.get('xnbid', 'N/A'))}<br>เครือข่าย: {net_popup} ({net_code_popup})"
         ).add_to(m)
 
