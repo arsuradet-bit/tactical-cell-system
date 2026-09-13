@@ -10,7 +10,7 @@ st.set_page_config(
 )
 
 # --- ระบบความปลอดภัย: ตรวจสอบรหัสผ่านก่อนเข้าใช้งาน ---
-TACTICAL_PASSWORD = "TAC2026"
+TACTICAL_PASSWORD = "ncid"
 
 if "authenticated" not in st.session_state:
     st.session_state.authenticated = False
