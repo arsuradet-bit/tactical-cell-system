@@ -9,8 +9,7 @@ st.set_page_config(
     page_title="INTEL : TACTICAL CELL ANALYSIS SYSTEM", layout="wide"
 )
 
-# --- ระบบความปลอดภัย: ตรวจสอบรหัสผ่านก่อนเข้าใช้งาน ---
-# ตั้งค่ารหัสผ่านเข้าใช้งานเป็น ncid
+# --- ระบบความปลอดภัย ---
 TACTICAL_PASSWORD = "ncid"
 
 if "authenticated" not in st.session_state:
@@ -55,7 +54,7 @@ DB_PORT = "5432"
 DB_NAME = "postgres"
 
 # ==========================================
-# CSS Hack: บังคับทุกช่องให้สูง 45px เท่ากันเป๊ะ 100%
+# CSS: เน้นความสะอาดตา ลบตัวบีบช่องที่ทำให้ UI พังออก
 # ==========================================
 st.markdown(
     """
@@ -69,53 +68,38 @@ st.markdown(
         margin-bottom: 25px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
     }
     
+    /* สีปุ่มหลัก */
     .stButton > button, [data-testid="stFormSubmitButton"] > button {
         background-color: #2563eb !important;
         color: white !important;
         border: none !important;
         font-weight: bold !important;
-        height: 45px !important; 
-        min-height: 45px !important;
-        margin: 0 !important;
-        display: flex; align-items: center; justify-content: center;
     }
     .stButton > button:hover, [data-testid="stFormSubmitButton"] > button:hover {
         background-color: #1d4ed8 !important;
     }
     
-    div[data-baseweb="select"] > div {
-        background-color: #1e293b !important;
-        color: white !important;
-        border: 1px solid #3b82f6 !important;
-        height: 45px !important;
-        min-height: 45px !important;
-    }
-    
-    [data-testid="stFileUploadDropzone"] {
-        background-color: #1e293b !important;
-        border: 1px dashed #3b82f6 !important;
-        height: 45px !important;
-        min-height: 45px !important;
-        padding: 0px 10px !important;
-        display: flex; align-items: center; justify-content: center;
-    }
-    [data-testid="stFileUploadDropzone"] button {
-        display: none !important;
-    }
-    
-    input[type="text"], input[type="password"] {
+    /* แต่งสีช่องกรอกและ Selectbox ให้กลมกลืนกับธีมมืด */
+    input[type="text"], input[type="password"], div[data-baseweb="select"] > div {
         color: #ffffff !important;
         background-color: #1e293b !important;
         border: 1px solid #3b82f6 !important;
-        height: 45px !important; 
     }
     input::placeholder { color: #94a3b8 !important; opacity: 1 !important; }
+    
+    /* แต่งกล่อง File Uploader ให้เข้ากับธีมมืด */
+    [data-testid="stFileUploadDropzone"] {
+        background-color: #1e293b !important;
+        border: 1px dashed #3b82f6 !important;
+    }
+    [data-testid="stFileUploadDropzone"] div {
+        color: #e2e8f0 !important;
+    }
     </style>
 """,
     unsafe_allow_html=True,
 )
 
-# --- สร้าง Session State ---
 if "search_message" not in st.session_state:
     st.session_state.search_message = ""
 if "alert_type" not in st.session_state:
@@ -123,7 +107,6 @@ if "alert_type" not in st.session_state:
 if "target_df" not in st.session_state:
     st.session_state.target_df = pd.DataFrame()
 
-# --- ส่วนหัวระบบ (Header) ---
 st.markdown(
     """
     <div class="tactical-header">
@@ -149,7 +132,7 @@ def get_engine():
 engine = get_engine()
 
 # ==========================================
-# 📥 1. อัปโหลดฐานข้อมูลเสา (G-MoN Pro CSV)
+# 📥 1. อัปโหลดฐานข้อมูลเสา (G-MoN Pro CSV) - ออกแบบ UI ใหม่
 # ==========================================
 st.markdown("#### 📥 1. อัปโหลดฐานข้อมูลเสา (G-MoN Pro CSV)")
 
@@ -161,14 +144,17 @@ network_mapping = {
     "⚪ ไม่ระบุ (ใช้ข้อมูลเดิมในไฟล์)": {"name": None, "code": None}
 }
 
-col_net, col_file, col_btn = st.columns([1.2, 1.8, 1.2], vertical_alignment="center")
-
-with col_net:
-    selected_network = st.selectbox("เครือข่าย", options=list(network_mapping.keys()), label_visibility="collapsed")
-with col_file:
-    uploaded_file = st.file_uploader("เลือกไฟล์ CSV", type=["csv"], label_visibility="collapsed")
-with col_btn:
-    upload_clicked = st.button("⬆️ อัปโหลดเข้าฐานข้อมูล", use_container_width=True)
+# ใช้กรอบ Container ครอบไว้ให้ดูเป็นระเบียบ
+with st.container(border=True):
+    # กล่องลากไฟล์อยู่ด้านบน กว้างเต็มบรรทัด
+    uploaded_file = st.file_uploader("ลากไฟล์ CSV มาวางที่นี่ หรือคลิกเพื่อเลือกไฟล์", type=["csv"])
+    
+    # แบ่ง 2 ช่องด้านล่างสำหรับ เลือกเครือข่าย และ ปุ่มกด
+    col_net, col_btn = st.columns([2, 1], vertical_alignment="bottom")
+    with col_net:
+        selected_network = st.selectbox("กำหนดเครือข่าย (กรณีข้อมูลแหว่ง)", options=list(network_mapping.keys()))
+    with col_btn:
+        upload_clicked = st.button("⬆️ อัปโหลดเข้าฐานข้อมูล", use_container_width=True)
 
 if upload_clicked:
     if uploaded_file is not None:
@@ -193,22 +179,25 @@ if upload_clicked:
 st.markdown("---")
 
 # ==========================================
-# 🔍 2. ส่วนค้นหาพิกัดยุทธวิธี
+# 🔍 2. ส่วนค้นหาพิกัดยุทธวิธี - นำช่อง NBID กลับมา
 # ==========================================
 st.markdown("#### 🔍 2. ค้นหาพิกัดและแกะรอยเป้าหมาย")
 with st.form(key="search_form"):
-    # ปรับเหลือ 3 ช่อง (CELL, LAC, ปุ่ม SCAN)
-    col_s1, col_s2, col_btn = st.columns([1.5, 1.5, 1], vertical_alignment="center")
+    # แบ่งเป็น 4 ช่องเท่าๆ กัน (CELL, LAC, NBID, SCAN)
+    col_s1, col_s2, col_s3, col_s4 = st.columns([1, 1, 1, 1], vertical_alignment="bottom")
     
     with col_s1:
         cell_input = st.text_input("CELL (XCI)", placeholder="ระบุรหัส CELL...")
     with col_s2:
         lac_input = st.text_input("LAC (LAC/TAC)", placeholder="ระบุรหัส LAC...")
-    with col_btn:
+    with col_s3:
+        # นำช่องค้นหากลับมา และเปลี่ยนชื่อเป็น NBID (เพื่อไม่ให้สับสนกับรหัสผ่าน)
+        nbid_input = st.text_input("NBID (Node ID)", placeholder="ระบุรหัส NBID...")
+    with col_s4:
         scan_clicked = st.form_submit_button("SCAN 🔍", use_container_width=True)
 
 if scan_clicked:
-    if not cell_input and not lac_input:
+    if not cell_input and not lac_input and not nbid_input:
         st.session_state.search_message = "⚠️ กรุณากรอกข้อมูลสำหรับค้นหาอย่างน้อย 1 ช่อง"
         st.session_state.alert_type = "error"
         st.session_state.target_df = pd.DataFrame()
@@ -225,6 +214,11 @@ if scan_clicked:
                 if lac_input:
                     query += " AND (CAST(\"lac/tac\" AS TEXT) LIKE :lac)"
                     params["lac"] = f"%{lac_input.strip()}%"
+
+                if nbid_input:
+                    # ค้นหาผ่านคอลัมน์ xnbid ในฐานข้อมูล
+                    query += " AND (CAST(xnbid AS TEXT) LIKE :nbid)"
+                    params["nbid"] = f"%{nbid_input.strip()}%"
 
                 with engine.connect() as conn:
                     filtered_df = pd.read_sql(text(query), conn, params=params)
@@ -276,7 +270,7 @@ if not target_df.empty and "lat" in target_df.columns and "lon" in target_df.col
         folium.CircleMarker(
             location=[row["lat"], row["lon"]],
             radius=6, color="#38bdf8", fill=True, fill_color="#38bdf8", fill_opacity=0.9,
-            popup=f"CELL: {row.get('xci', 'N/A')} | LAC: {row.get('lac/tac', 'N/A')}<br>เครือข่าย: {net_popup} ({net_code_popup})"
+            popup=f"CELL: {row.get('xci', 'N/A')} | LAC: {row.get('lac/tac', 'N/A')} | NBID: {row.get('xnbid', 'N/A')}<br>เครือข่าย: {net_popup} ({net_code_popup})"
         ).add_to(m)
 
 st_folium(m, width="100%", height=700, key="tactical_map")
