@@ -10,6 +10,7 @@ st.set_page_config(
 )
 
 # --- ระบบความปลอดภัย: ตรวจสอบรหัสผ่านก่อนเข้าใช้งาน ---
+# ตั้งค่ารหัสผ่านเข้าใช้งานเป็น ncid
 TACTICAL_PASSWORD = "ncid"
 
 if "authenticated" not in st.session_state:
@@ -53,14 +54,14 @@ DB_HOST = "34.15.139.132"
 DB_PORT = "5432"
 DB_NAME = "postgres"
 
-# CSS แก้ไขใหม่: เน้นความสว่างของตัวหนังสือและการจัดตำแหน่ง
+# ==========================================
+# CSS Hack: บังคับทุกช่องให้สูง 45px เท่ากันเป๊ะ 100%
+# ==========================================
 st.markdown(
     """
     <style>
-    /* พื้นหลังหลักของเว็บ */
     .stApp { background-color: #0b1426 !important; color: #e2e8f0; }
     
-    /* กล่อง Header หลัก */
     .tactical-header {
         background: linear-gradient(90deg, #0f172a 0%, #1e293b 100%);
         padding: 20px; border-radius: 8px; text-align: center; 
@@ -68,43 +69,47 @@ st.markdown(
         margin-bottom: 25px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
     }
     
-    /* บังคับสีปุ่มกดทั้งหมดให้เป็นสีน้ำเงิน Tactical Blue (ลบสีแดง) */
     .stButton > button, [data-testid="stFormSubmitButton"] > button {
         background-color: #2563eb !important;
         color: white !important;
         border: none !important;
         font-weight: bold !important;
-        height: 40px !important;
+        height: 45px !important; 
+        min-height: 45px !important;
+        margin: 0 !important;
+        display: flex; align-items: center; justify-content: center;
     }
     .stButton > button:hover, [data-testid="stFormSubmitButton"] > button:hover {
-        background-color: #1d4ed8 !important; /* เข้มขึ้นเมื่อชี้เมาส์ */
+        background-color: #1d4ed8 !important;
     }
     
-    /* แก้ไขปัญหาช่องกรอกข้อมูลมืด มองไม่เห็น */
-    input[type="text"], input[type="password"] {
-        color: #ffffff !important; /* สีตัวหนังสือตอนพิมพ์ (ขาว) */
-        background-color: #1e293b !important; /* พื้นหลังช่องกรอก */
-        border: 1px solid #3b82f6 !important;
-    }
-    input::placeholder {
-        color: #94a3b8 !important; /* สีข้อความจางๆ (Placeholder) ให้สว่างขึ้น */
-        opacity: 1 !important;
-    }
-    
-    /* ปรับแต่ง Dropdown Selectbox */
     div[data-baseweb="select"] > div {
         background-color: #1e293b !important;
         color: white !important;
         border: 1px solid #3b82f6 !important;
+        height: 45px !important;
+        min-height: 45px !important;
     }
     
-    /* ปรับขนาดกล่องอัปโหลดไฟล์ให้พอดีกับช่องอื่นๆ */
     [data-testid="stFileUploadDropzone"] {
         background-color: #1e293b !important;
         border: 1px dashed #3b82f6 !important;
+        height: 45px !important;
+        min-height: 45px !important;
         padding: 0px 10px !important;
-        min-height: 40px !important;
+        display: flex; align-items: center; justify-content: center;
     }
+    [data-testid="stFileUploadDropzone"] button {
+        display: none !important;
+    }
+    
+    input[type="text"], input[type="password"] {
+        color: #ffffff !important;
+        background-color: #1e293b !important;
+        border: 1px solid #3b82f6 !important;
+        height: 45px !important; 
+    }
+    input::placeholder { color: #94a3b8 !important; opacity: 1 !important; }
     </style>
 """,
     unsafe_allow_html=True,
@@ -156,8 +161,7 @@ network_mapping = {
     "⚪ ไม่ระบุ (ใช้ข้อมูลเดิมในไฟล์)": {"name": None, "code": None}
 }
 
-# ใช้ vertical_alignment="bottom" เพื่อให้กล่องและปุ่มถูกดึงลงมาขอบล่างเท่ากันเป๊ะ
-col_net, col_file, col_btn = st.columns([1.2, 1.8, 1.2], vertical_alignment="bottom")
+col_net, col_file, col_btn = st.columns([1.2, 1.8, 1.2], vertical_alignment="center")
 
 with col_net:
     selected_network = st.selectbox("เครือข่าย", options=list(network_mapping.keys()), label_visibility="collapsed")
@@ -193,20 +197,18 @@ st.markdown("---")
 # ==========================================
 st.markdown("#### 🔍 2. ค้นหาพิกัดและแกะรอยเป้าหมาย")
 with st.form(key="search_form"):
-    # ใช้ vertical_alignment="bottom" จัดให้ปุ่ม SCAN อยู่ระดับเดียวกับช่องพิมพ์
-    col_s1, col_s2, col_s3, col_s4 = st.columns([1, 1, 1, 1], vertical_alignment="bottom")
+    # ปรับเหลือ 3 ช่อง (CELL, LAC, ปุ่ม SCAN)
+    col_s1, col_s2, col_btn = st.columns([1.5, 1.5, 1], vertical_alignment="center")
     
     with col_s1:
         cell_input = st.text_input("CELL (XCI)", placeholder="ระบุรหัส CELL...")
     with col_s2:
         lac_input = st.text_input("LAC (LAC/TAC)", placeholder="ระบุรหัส LAC...")
-    with col_s3:
-        ncid_input = st.text_input("NCID", placeholder="ระบุรหัส NCID...")
-    with col_s4:
+    with col_btn:
         scan_clicked = st.form_submit_button("SCAN 🔍", use_container_width=True)
 
 if scan_clicked:
-    if not cell_input and not lac_input and not ncid_input:
+    if not cell_input and not lac_input:
         st.session_state.search_message = "⚠️ กรุณากรอกข้อมูลสำหรับค้นหาอย่างน้อย 1 ช่อง"
         st.session_state.alert_type = "error"
         st.session_state.target_df = pd.DataFrame()
@@ -223,10 +225,6 @@ if scan_clicked:
                 if lac_input:
                     query += " AND (CAST(\"lac/tac\" AS TEXT) LIKE :lac)"
                     params["lac"] = f"%{lac_input.strip()}%"
-
-                if ncid_input:
-                    query += " AND (CAST(ncid AS TEXT) LIKE :ncid OR CAST(xnbid AS TEXT) LIKE :ncid)"
-                    params["ncid"] = f"%{ncid_input.strip()}%"
 
                 with engine.connect() as conn:
                     filtered_df = pd.read_sql(text(query), conn, params=params)
@@ -278,7 +276,7 @@ if not target_df.empty and "lat" in target_df.columns and "lon" in target_df.col
         folium.CircleMarker(
             location=[row["lat"], row["lon"]],
             radius=6, color="#38bdf8", fill=True, fill_color="#38bdf8", fill_opacity=0.9,
-            popup=f"CELL: {row.get('xci', 'N/A')} | LAC: {row.get('lac/tac', 'N/A')} | NCID: {row.get('ncid', row.get('xnbid', 'N/A'))}<br>เครือข่าย: {net_popup} ({net_code_popup})"
+            popup=f"CELL: {row.get('xci', 'N/A')} | LAC: {row.get('lac/tac', 'N/A')}<br>เครือข่าย: {net_popup} ({net_code_popup})"
         ).add_to(m)
 
 st_folium(m, width="100%", height=700, key="tactical_map")
