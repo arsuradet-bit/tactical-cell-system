@@ -73,6 +73,8 @@ st.markdown(
         background-color: #2b1313; color: #e63946; padding: 12px; border-radius: 6px;
         border: 1px solid #9d0208; font-weight: bold; margin-bottom: 15px;
     }
+    /* ปรับแต่งปุ่มอัปโหลดให้เป็นสีเขียวแบบในรูป */
+    button[title="View fullscreen"] { display: none; }
     </style>
 """,
     unsafe_allow_html=True,
@@ -117,47 +119,69 @@ def get_engine():
 engine = get_engine()
 
 # ==========================================
-# 📤 ส่วนอัปโหลดข้อมูลจาก G-Mon Pro เข้า Cloud SQL
+# 📥 1. อัปโหลดฐานข้อมูลเสา (G-MoN Pro CSV)
 # ==========================================
-with st.expander("📤 นำเข้าข้อมูลเป้าหมายใหม่ (G-Mon Pro CSV Upload)", expanded=False):
-    st.markdown("**(Optional) เติมข้อมูลเครือข่ายอัตโนมัติ:** หากในไฟล์ CSV ไม่มีข้อมูลเครือข่าย (เช่น เลข 5200X ไม่มา) ให้พิมพ์ระบุด้านล่าง ระบบจะเติมข้อมูลให้ทุกบรรทัดก่อนบันทึก")
-    
-    col_up1, col_up2 = st.columns(2)
-    with col_up1:
-        manual_net_name = st.text_input("ชื่อเครือข่าย", placeholder="เช่น AIS, TRUE, DTAC (เว้นว่างได้ถ้าไม่ต้องการเติม)")
-    with col_up2:
-        manual_net_code = st.text_input("เลขเครือข่าย (MCC/MNC)", placeholder="เช่น 52003, 52004 (เว้นว่างได้ถ้าไม่ต้องการเติม)")
+st.markdown("#### 📥 1. อัปโหลดฐานข้อมูลเสา (G-MoN Pro CSV)")
 
-    uploaded_file = st.file_uploader("ลากไฟล์ CSV จาก G-Mon Pro มาวางที่นี่", type=["csv"])
-    
+# ตั้งค่า Map ตัวเลือกเครือข่ายเข้ากับค่าที่จะบันทึกลงฐานข้อมูล
+network_mapping = {
+    "🟢 AIS (52001, 52003)": {"name": "AIS", "code": "52001, 52003"},
+    "🔴 TRUE (52000, 52004)": {"name": "TRUE", "code": "52000, 52004"},
+    "🔵 DTAC (52005, 52018)": {"name": "DTAC", "code": "52005, 52018"},
+    "🟡 NT (52002, 52015)": {"name": "NT", "code": "52002, 52015"},
+    "⚪ ไม่ระบุ (ใช้ข้อมูลเดิมในไฟล์)": {"name": None, "code": None}
+}
+
+# จัด Layout เป็น 3 คอลัมน์ให้อยู่ในบรรทัดเดียวกันตามภาพ
+col_net, col_file, col_btn = st.columns([1.5, 2.5, 1.2])
+
+with col_net:
+    selected_network = st.selectbox(
+        "เครือข่าย", 
+        options=list(network_mapping.keys()), 
+        label_visibility="collapsed" # ซ่อน Label ด้านบนเพื่อให้ตรงกับภาพ
+    )
+
+with col_file:
+    uploaded_file = st.file_uploader(
+        "เลือกไฟล์ CSV", 
+        type=["csv"], 
+        label_visibility="collapsed" # ซ่อน Label ด้านบน
+    )
+
+with col_btn:
+    upload_clicked = st.button("⬆️ อัปโหลดเข้าฐานข้อมูล", use_container_width=True, type="primary")
+
+# เมื่อกดปุ่มอัปโหลด
+if upload_clicked:
     if uploaded_file is not None:
-        if st.button("บันทึกข้อมูลเข้า Cloud SQL", type="primary"):
-            with st.spinner("กำลังเตรียมข้อมูลและเขียนลงฐานข้อมูล..."):
-                try:
-                    # 1. อ่านไฟล์ CSV
-                    df_upload = pd.read_csv(uploaded_file)
-                    
-                    # 2. ปรับชื่อคอลัมน์ให้เป็นตัวพิมพ์เล็กทั้งหมด
-                    df_upload.columns = [str(c).strip().lower() for c in df_upload.columns]
-                    
-                    # 3. ถ้าผู้กองระบุข้อมูลเครือข่ายมา ให้สร้าง/ทับคอลัมน์นั้นใน Dataframe ก่อนดันขึ้น Database
-                    if manual_net_name:
-                        df_upload['network_name'] = manual_net_name  # เปลี่ยนชื่อคอลัมน์ตรงนี้ให้ตรงกับ Database ได้ครับ
-                    if manual_net_code:
-                        df_upload['network_code'] = manual_net_code  # เปลี่ยนชื่อคอลัมน์ตรงนี้ให้ตรงกับ Database ได้ครับ
-                    
-                    # 4. เขียนข้อมูลลง Cloud SQL (ตาราง gmon_survey_logs) แบบต่อท้าย (append)
-                    df_upload.to_sql('gmon_survey_logs', con=engine, if_exists='append', index=False)
-                    
-                    st.success(f"✅ สำเร็จ! นำเข้าข้อมูลพิกัดใหม่จำนวน {len(df_upload):,} จุด เรียบร้อยแล้ว พร้อมใช้งานในระบบค้นหาทันที")
-                except Exception as e:
-                    st.error(f"❌ เกิดข้อผิดพลาด: {e} (กรุณาเช็คว่าชื่อคอลัมน์ใน CSV ตรงกับในฐานข้อมูลหรือไม่)")
+        with st.spinner("กำลังเตรียมข้อมูลและบันทึกลงฐานข้อมูล..."):
+            try:
+                # อ่านไฟล์
+                df_upload = pd.read_csv(uploaded_file)
+                df_upload.columns = [str(c).strip().lower() for c in df_upload.columns]
+                
+                # นำค่าเครือข่ายที่เลือกไปใส่ใน DataFrame
+                net_info = network_mapping[selected_network]
+                if net_info["name"]:
+                    df_upload['network_name'] = net_info["name"]
+                if net_info["code"]:
+                    df_upload['network_code'] = net_info["code"]
+                
+                # อัปโหลดเข้าตาราง
+                df_upload.to_sql('gmon_survey_logs', con=engine, if_exists='append', index=False)
+                st.success(f"✅ สำเร็จ! นำเข้าข้อมูลพิกัดใหม่จำนวน {len(df_upload):,} จุด เรียบร้อยแล้ว")
+            except Exception as e:
+                st.error(f"❌ เกิดข้อผิดพลาด: {e}")
+    else:
+        st.warning("⚠️ กรุณาเลือกไฟล์ CSV ก่อนกดอัปโหลด")
 
 st.markdown("---")
 
 # ==========================================
-# 🔍 ส่วนค้นหาพิกัดยุทธวิธี
+# 🔍 2. ส่วนค้นหาพิกัดยุทธวิธี
 # ==========================================
+st.markdown("#### 🔍 2. ค้นหาพิกัดและแกะรอยเป้าหมาย")
 with st.form(key="search_form"):
     col_s1, col_s2, col_s3, col_btn = st.columns([2, 2, 2, 1])
     with col_s1:
@@ -244,7 +268,6 @@ if not target_df.empty and "lat" in target_df.columns and "lon" in target_df.col
     map_df["lon"] = map_df["lon"].astype(float)
 
     for idx, row in map_df.iterrows():
-        # ดึงข้อมูลเพิ่มเติมมาแสดงใน Popup ของจุดบนแผนที่
         net_popup = row.get('network_name', 'N/A')
         net_code_popup = row.get('network_code', 'N/A')
         
