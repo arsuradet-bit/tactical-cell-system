@@ -54,27 +54,82 @@ DB_HOST = "34.15.139.132"
 DB_PORT = "5432"
 DB_NAME = "postgres"
 
-# Custom CSS ธีมเข้มสไตล์ Tactical
+# Custom CSS ธีม Detective Blue และการจัด Layout
 st.markdown(
     """
     <style>
-    .main { background-color: #0b132b; color: #ffffff; }
-    .stApp { background-color: #0b132b; }
-    h1, h2, h3, h4, p, label { color: #ffffff !important; }
-    .tactical-header {
-        background-color: #1c2541; padding: 15px; border-radius: 8px;
-        text-align: center; border: 1px solid #3a506b; margin-bottom: 20px;
+    /* พื้นหลังหลักของเว็บ */
+    .stApp { 
+        background-color: #0b1426 !important; 
+        color: #e2e8f0; 
     }
+    
+    /* กล่อง Header หลัก */
+    .tactical-header {
+        background: linear-gradient(90deg, #0f172a 0%, #1e293b 100%);
+        padding: 20px; 
+        border-radius: 8px;
+        text-align: center; 
+        border-left: 5px solid #3b82f6;
+        border-right: 5px solid #3b82f6;
+        margin-bottom: 25px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+    }
+    
+    /* สีของปุ่มกดหลัก (ปุ่ม SCAN และ อัปโหลด) */
+    .stButton > button[kind="primary"] {
+        background-color: #1d4ed8 !important; /* สีน้ำเงินเข้ม */
+        color: white !important;
+        border: 1px solid #2563eb !important;
+        border-radius: 6px !important;
+        font-weight: bold !important;
+        height: 42px !important; /* ล็อกความสูงปุ่มให้เท่ากับช่องกรอกข้อมูล */
+    }
+    .stButton > button[kind="primary"]:hover {
+        background-color: #2563eb !important; /* สีสว่างขึ้นเมื่อชี้เมาส์ */
+        box-shadow: 0 0 10px rgba(59, 130, 246, 0.5);
+    }
+    
+    /* สีของปุ่มกดรอง (Logout) */
+    .stButton > button[kind="secondary"] {
+        background-color: #1e293b !important;
+        color: #e2e8f0 !important;
+        border: 1px solid #334155 !important;
+    }
+    
+    /* ปรับขนาดกล่องอัปโหลดไฟล์ให้บางลงและแนบเนียนขึ้น */
+    [data-testid="stFileUploadDropzone"] {
+        background-color: #1e293b !important;
+        border: 1px dashed #3b82f6 !important;
+        color: #e2e8f0 !important;
+        min-height: 42px !important; /* บีบความสูงให้เท่าปุ่ม */
+        padding: 5px !important;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    
+    /* สีช่องกรอกข้อมูลและ Selectbox */
+    .stTextInput input, .stSelectbox div[data-baseweb="select"] {
+        background-color: #1e293b !important;
+        color: white !important;
+        border: 1px solid #334155 !important;
+        border-radius: 6px !important;
+    }
+    
+    /* สีตัวอักษรหัวข้อและ Label */
+    label, .stMarkdown p { color: #94a3b8 !important; font-weight: 500 !important; }
+    h2, h3, h4 { color: #f8fafc !important; }
+    
+    /* กล่องแจ้งเตือน */
     .tactical-alert-success {
-        background-color: #132a13; color: #52b788; padding: 12px; border-radius: 6px;
-        border: 1px solid #2d6a4f; font-weight: bold; margin-bottom: 15px;
+        background-color: #064e3b; color: #34d399; padding: 12px; border-radius: 6px;
+        border: 1px solid #059669; font-weight: bold; margin-bottom: 15px;
     }
     .tactical-alert-error {
-        background-color: #2b1313; color: #e63946; padding: 12px; border-radius: 6px;
-        border: 1px solid #9d0208; font-weight: bold; margin-bottom: 15px;
+        background-color: #7f1d1d; color: #fca5a5; padding: 12px; border-radius: 6px;
+        border: 1px solid #b91c1c; font-weight: bold; margin-bottom: 15px;
     }
-    /* ปรับแต่งปุ่มอัปโหลดให้เป็นสีเขียวแบบในรูป */
-    button[title="View fullscreen"] { display: none; }
     </style>
 """,
     unsafe_allow_html=True,
@@ -92,8 +147,8 @@ if "target_df" not in st.session_state:
 st.markdown(
     """
     <div class="tactical-header">
-        <h2 style="color: #6fffe9; margin: 0;">INTEL : TACTICAL CELL ANALYSIS SYSTEM</h2>
-        <p style="color: #adb5bd; margin: 5px 0 0 0;">ระบบสืบสวนและวิเคราะห์พิกัดสัญญาณโทรศัพท์เคลื่อนที่ (Cloud SQL Powered)</p>
+        <h2 style="color: #38bdf8 !important; margin: 0;">INTEL : TACTICAL CELL ANALYSIS SYSTEM</h2>
+        <p style="color: #94a3b8; margin: 5px 0 0 0;">ระบบสืบสวนและวิเคราะห์พิกัดสัญญาณโทรศัพท์เคลื่อนที่ (Cloud SQL Powered)</p>
     </div>
 """,
     unsafe_allow_html=True,
@@ -123,7 +178,6 @@ engine = get_engine()
 # ==========================================
 st.markdown("#### 📥 1. อัปโหลดฐานข้อมูลเสา (G-MoN Pro CSV)")
 
-# ตั้งค่า Map ตัวเลือกเครือข่ายเข้ากับค่าที่จะบันทึกลงฐานข้อมูล
 network_mapping = {
     "🟢 AIS (52001, 52003)": {"name": "AIS", "code": "52001, 52003"},
     "🔴 TRUE (52000, 52004)": {"name": "TRUE", "code": "52000, 52004"},
@@ -132,43 +186,41 @@ network_mapping = {
     "⚪ ไม่ระบุ (ใช้ข้อมูลเดิมในไฟล์)": {"name": None, "code": None}
 }
 
-# จัด Layout เป็น 3 คอลัมน์ให้อยู่ในบรรทัดเดียวกันตามภาพ
-col_net, col_file, col_btn = st.columns([1.5, 2.5, 1.2])
+# จัด Layout 3 ช่องให้สัมพันธ์กัน (ปรับสมดุลช่อง)
+col_net, col_file, col_btn = st.columns([1.2, 1.8, 1])
 
 with col_net:
     selected_network = st.selectbox(
         "เครือข่าย", 
         options=list(network_mapping.keys()), 
-        label_visibility="collapsed" # ซ่อน Label ด้านบนเพื่อให้ตรงกับภาพ
+        label_visibility="collapsed"
     )
 
 with col_file:
     uploaded_file = st.file_uploader(
         "เลือกไฟล์ CSV", 
         type=["csv"], 
-        label_visibility="collapsed" # ซ่อน Label ด้านบน
+        label_visibility="collapsed"
     )
 
 with col_btn:
+    # เพิ่มระยะขอบบนนิดหน่อยให้ปุ่มตรงกับกล่องพอดีเป๊ะ
+    st.markdown("<div style='margin-top: 1px;'></div>", unsafe_allow_html=True)
     upload_clicked = st.button("⬆️ อัปโหลดเข้าฐานข้อมูล", use_container_width=True, type="primary")
 
-# เมื่อกดปุ่มอัปโหลด
 if upload_clicked:
     if uploaded_file is not None:
         with st.spinner("กำลังเตรียมข้อมูลและบันทึกลงฐานข้อมูล..."):
             try:
-                # อ่านไฟล์
                 df_upload = pd.read_csv(uploaded_file)
                 df_upload.columns = [str(c).strip().lower() for c in df_upload.columns]
                 
-                # นำค่าเครือข่ายที่เลือกไปใส่ใน DataFrame
                 net_info = network_mapping[selected_network]
                 if net_info["name"]:
                     df_upload['network_name'] = net_info["name"]
                 if net_info["code"]:
                     df_upload['network_code'] = net_info["code"]
                 
-                # อัปโหลดเข้าตาราง
                 df_upload.to_sql('gmon_survey_logs', con=engine, if_exists='append', index=False)
                 st.success(f"✅ สำเร็จ! นำเข้าข้อมูลพิกัดใหม่จำนวน {len(df_upload):,} จุด เรียบร้อยแล้ว")
             except Exception as e:
@@ -183,15 +235,18 @@ st.markdown("---")
 # ==========================================
 st.markdown("#### 🔍 2. ค้นหาพิกัดและแกะรอยเป้าหมาย")
 with st.form(key="search_form"):
-    col_s1, col_s2, col_s3, col_btn = st.columns([2, 2, 2, 1])
+    # แบ่งช่องเป็น 1:1:1:1 เท่าๆ กันทุกช่อง
+    col_s1, col_s2, col_s3, col_s4 = st.columns([1, 1, 1, 1])
+    
     with col_s1:
         cell_input = st.text_input("CELL (XCI)", placeholder="ระบุรหัส CELL...")
     with col_s2:
         lac_input = st.text_input("LAC (LAC/TAC)", placeholder="ระบุรหัส LAC...")
     with col_s3:
         ncid_input = st.text_input("NCID", placeholder="ระบุรหัส NCID...")
-    with col_btn:
-        st.write("")
+    with col_s4:
+        # ใช้ CSS ดันปุ่มลงมา 28px เพื่อให้ปุ่ม SCAN อยู่ในระนาบเดียวกับช่องกรอกข้อมูลพอดี
+        st.markdown("<div style='margin-top: 28px;'></div>", unsafe_allow_html=True)
         scan_clicked = st.form_submit_button("SCAN 🔍", use_container_width=True, type="primary")
 
 # เมื่อมีการกดปุ่ม SCAN
@@ -274,9 +329,9 @@ if not target_df.empty and "lat" in target_df.columns and "lon" in target_df.col
         folium.CircleMarker(
             location=[row["lat"], row["lon"]],
             radius=6,
-            color="#ff0000",
+            color="#38bdf8", # เปลี่ยนสีจุดบนแผนที่เป็นสีฟ้า (Cyber Blue)
             fill=True,
-            fill_color="#ff0000",
+            fill_color="#38bdf8",
             fill_opacity=0.9,
             popup=f"CELL: {row.get('xci', 'N/A')} | LAC: {row.get('lac/tac', 'N/A')} | NCID: {row.get('ncid', row.get('xnbid', 'N/A'))}<br>เครือข่าย: {net_popup} ({net_code_popup})"
         ).add_to(m)
