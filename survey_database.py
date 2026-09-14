@@ -56,8 +56,8 @@ def materialize(row):
                 status="พบพิกัด" if gps else "พิกัดว่างหรือไม่ถูกต้อง")
 
 
-def search(engine, cells=(), lacs=(), nbids=(), plmns=(), bounds=None, limit=100000, pairs=()):
-    clauses, params, bindings = [], {"limit": limit + 1}, []
+def search(engine, cells=(), lacs=(), nbids=(), plmns=(), bounds=None, limit=None, pairs=()):
+    clauses, params, bindings = [], {}, []
     if pairs:
         pair_clauses = []
         for i, (cell, lac) in enumerate(dict.fromkeys(pairs)):
@@ -75,11 +75,12 @@ def search(engine, cells=(), lacs=(), nbids=(), plmns=(), bounds=None, limit=100
         params.update(bounds)
     if not clauses:
         raise ValueError("กรุณาระบุเงื่อนไขค้นหา")
-    statement = text(_source(engine) + "SELECT * FROM observations WHERE " + " AND ".join(clauses) + " ORDER BY observation_key LIMIT :limit").bindparams(*bindings)
+    suffix = " ORDER BY observation_key" + (" LIMIT :limit" if limit is not None else "")
+    if limit is not None:
+        params["limit"] = limit
+    statement = text(_source(engine) + "SELECT * FROM observations WHERE " + " AND ".join(clauses) + suffix).bindparams(*bindings)
     with engine.connect() as conn:
         rows = [materialize(r) for r in conn.execute(statement, params).mappings()]
-    if len(rows) > limit:
-        raise ValueError(f"พบมากกว่า {limit:,} รายการ กรุณาลดเงื่อนไขค้นหา ไม่มีการตัดข้อมูลออกจากฐานข้อมูล")
     return rows, False
 
 
@@ -91,7 +92,7 @@ def lookup_pairs(engine, pairs, plmns=()):
     for start in range(0, len(unique_pairs), 40):
         # A fresh short transaction per batch keeps large CDR imports from
         # holding one Cloud SQL connection for the entire analysis.
-        results.extend(search(engine, pairs=unique_pairs[start:start+40], plmns=plmns, limit=100000)[0])
+        results.extend(search(engine, pairs=unique_pairs[start:start+40], plmns=plmns, limit=None)[0])
     return results
 
 
