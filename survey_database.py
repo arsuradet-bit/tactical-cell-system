@@ -88,10 +88,10 @@ def lookup_pairs(engine, pairs, plmns=()):
     results = []
     # Bound SQL size, not the number of CDR events. Canonicalize before batching.
     unique_pairs = list(dict.fromkeys((identifier(c), identifier(l)) for c, l in unique_pairs))
-    for start in range(0, len(unique_pairs), 300):
+    for start in range(0, len(unique_pairs), 40):
         # A fresh short transaction per batch keeps large CDR imports from
         # holding one Cloud SQL connection for the entire analysis.
-        results.extend(search(engine, pairs=unique_pairs[start:start+300], plmns=plmns, limit=100000)[0])
+        results.extend(search(engine, pairs=unique_pairs[start:start+40], plmns=plmns, limit=100000)[0])
     return results
 
 
