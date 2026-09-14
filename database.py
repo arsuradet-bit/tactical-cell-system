@@ -12,7 +12,7 @@ def connect(config):
     url = URL.create("postgresql+psycopg2", username=config["user"], password=config["password"],
                      host=config["host"], port=int(config.get("port", 5432)), database=config.get("name", "postgres"))
     args = {"connect_timeout": 8, "sslmode": config.get("sslmode", "require"),
-            "options": "-c statement_timeout=20000", "application_name": "intel_cell"}
+            "options": "-c statement_timeout=60000", "application_name": "intel_cell"}
     for key in ("sslrootcert", "sslcert", "sslkey"):
         if config.get(key):
             args[key] = config[key]
