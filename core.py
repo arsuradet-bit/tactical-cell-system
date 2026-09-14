@@ -127,7 +127,12 @@ def read_table(data: bytes, filename: str, max_rows=100000):
     if len(data) > 20 * 1024 * 1024:
         raise ValueError("ไฟล์ต้องไม่เกิน 20 MB")
     if filename.lower().endswith(".xlsx"):
-        df = pd.read_excel(io.BytesIO(data), dtype=str, keep_default_na=False)
+        sheets = pd.read_excel(io.BytesIO(data), sheet_name=None, dtype=str, keep_default_na=False)
+        frames = [frame for frame in sheets.values() if not frame.empty]
+        if not frames:
+            raise ValueError("ไฟล์ไม่มีรายการข้อมูล")
+        # Preserve every row from every worksheet, including intentional duplicates.
+        df = pd.concat(frames, ignore_index=True, sort=False)
     else:
         decoded = None
         encodings = ("utf-16",) if data.startswith((b"\xff\xfe", b"\xfe\xff")) else ("utf-8-sig", "cp874")
@@ -180,7 +185,10 @@ def prepare_gmon(df):
             xci, lac = identifier(row["xci"]), identifier(row["lac/tac"])
             if not xci or not lac:
                 raise ValueError("ไม่มี XCI หรือ LAC/TAC")
-            raw = {k: clean(v) for k, v in row.items()}
+            # Subscriber/device identifiers are not needed for G-Mon analysis;
+            # exclude them before the raw row can be persisted.
+            raw = {k: clean(v) for k, v in row.items()
+                   if not re.search(r"(?:^|[^a-z])(imsi|imei|number ?a|number ?b)(?:$|[^a-z])", str(k).lower())}
             record = dict(plmn=plmn_value(row["plmn"]), xci=xci, lac=lac,
                           xnbid=identifier(row.get("xnbid")), local_cid=identifier(row.get("local_cid")),
                           system=clean(row.get("system")), lat=gps[0], lon=gps[1],

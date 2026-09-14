@@ -7,7 +7,7 @@ from core import clean, coordinates, identifier, number, timestamp
 
 def health(engine):
     with engine.connect() as conn:
-        return bool(conn.execute(text("SELECT to_regclass('public.gmon_survey_logs') IS NOT NULL AND to_regclass('public.intel_gmon_uploads') IS NOT NULL")).scalar())
+        return bool(conn.execute(text("SELECT to_regclass('public.intel_gmon_uploads') IS NOT NULL")).scalar())
 
 
 def normalized(expression):
@@ -21,6 +21,20 @@ SOURCE = """WITH raw_rows AS (
 """ + ",".join(normalized(expr) + " AS " + name for name, expr in [
     ("xci", "raw->>'xci'"), ("lac", "coalesce(raw->>'lac/tac',raw->>'lac_tac')"),
     ("xnbid", "raw->>'xnbid'"), ("plmn", "raw->>'plmn'")]) + " FROM raw_rows) "
+
+SOURCE_UPLOAD = """WITH raw_rows AS (
+ SELECT 'upload:' || id::text AS observation_key, raw FROM intel_gmon_uploads
+), observations AS (SELECT observation_key,raw,
+""" + ",".join(normalized(expr) + " AS " + name for name, expr in [
+    ("xci", "raw->>'xci'"), ("lac", "coalesce(raw->>'lac/tac',raw->>'lac_tac')"),
+    ("xnbid", "raw->>'xnbid'"), ("plmn", "raw->>'plmn'")]) + " FROM raw_rows) "
+
+
+def _source(engine):
+    with engine.connect() as conn:
+        legacy = bool(conn.execute(text("SELECT to_regclass('public.gmon_survey_logs') IS NOT NULL")).scalar())
+    return SOURCE if legacy else SOURCE_UPLOAD
+
 
 
 def materialize(row):
@@ -61,7 +75,7 @@ def search(engine, cells=(), lacs=(), nbids=(), plmns=(), bounds=None, limit=100
         params.update(bounds)
     if not clauses:
         raise ValueError("กรุณาระบุเงื่อนไขค้นหา")
-    statement = text(SOURCE + "SELECT * FROM observations WHERE " + " AND ".join(clauses) + " ORDER BY observation_key LIMIT :limit").bindparams(*bindings)
+    statement = text(_source(engine) + "SELECT * FROM observations WHERE " + " AND ".join(clauses) + " ORDER BY observation_key LIMIT :limit").bindparams(*bindings)
     with engine.connect() as conn:
         rows = [materialize(r) for r in conn.execute(statement, params).mappings()]
     if len(rows) > limit:
@@ -75,7 +89,9 @@ def lookup_pairs(engine, pairs, plmns=()):
     # Bound SQL size, not the number of CDR events. Canonicalize before batching.
     unique_pairs = list(dict.fromkeys((identifier(c), identifier(l)) for c, l in unique_pairs))
     for start in range(0, len(unique_pairs), 300):
-        results.extend(search(engine, pairs=unique_pairs[start:start+300], plmns=plmns)[0])
+        # A fresh short transaction per batch keeps large CDR imports from
+        # holding one Cloud SQL connection for the entire analysis.
+        results.extend(search(engine, pairs=unique_pairs[start:start+300], plmns=plmns, limit=100000)[0])
     return results
 
 
@@ -87,3 +103,10 @@ def save_raw(engine, frame):
             conn.execute(text("INSERT INTO intel_gmon_uploads(raw) SELECT value FROM jsonb_array_elements(CAST(:batch AS jsonb))"),
                          {"batch": json.dumps(records[offset:offset+500], ensure_ascii=False)})
     return len(records)
+
+def checkpoints(engine):
+    """Read the checkpoint reference table used to place camera events."""
+    with engine.connect() as conn:
+        return [dict(r) for r in conn.execute(text(
+            "SELECT checkpoint_code, checkpoint_name, direction, lat, lon FROM intel_checkpoints"
+        )).mappings()]

@@ -172,10 +172,9 @@ with st.container(border=True, key="search_panel"):
 
 with st.expander("📞 วิเคราะห์ CDR · VOICE / DATA · ใช้ชั่วคราว"):
     st.caption("จับคู่ทุกพิกัด G-Mon ด้วย LAC/CELL · ใช้พิกัด CDR เมื่อไม่พบ G-Mon · ไม่บันทึก CDR ลงฐานข้อมูล")
-    a, b, c = st.columns(3)
+    a, b = st.columns(2)
     voice = a.file_uploader("ไฟล์ VOICE", type=["csv","txt","xlsx"], key=f"voice_{st.session_state.cdr_generation}")
     data = b.file_uploader("ไฟล์ DATA", type=["csv","txt","xlsx"], key=f"data_{st.session_state.cdr_generation}")
-    sms = c.file_uploader("ไฟล์ SMS", type=["csv","txt","xlsx"], key=f"sms_{st.session_state.cdr_generation}")
     with st.form("cdr_options"):
         cdr_network = st.selectbox("เครือข่ายของ CDR", ["ไม่ระบุ"]+list(NETWORKS), format_func=network_label)
         filter_time = st.checkbox("กรองช่วงเวลาเหตุการณ์")
@@ -191,7 +190,7 @@ with st.expander("📞 วิเคราะห์ CDR · VOICE / DATA · ใช
             if not voice and not data:
                 raise ValueError("เลือกไฟล์ VOICE หรือ DATA อย่างน้อยหนึ่งไฟล์")
             batches, all_errors, offset = [], [], 0
-            for kind, file in [("VOICE",voice),("DATA",data),("SMS",sms)]:
+            for kind, file in [("VOICE",voice),("DATA",data)]:
                 if file:
                     raw = read_table(file.getvalue(), file.name, max_rows=None)
                     events, errors = prepare_cdr(raw, kind=kind, offset=offset)
@@ -221,8 +220,11 @@ with st.expander("📞 วิเคราะห์ CDR · VOICE / DATA · ใช
             st.session_state.revision += 1
         except ValueError as exc:
             st.error(str(exc))
-        except Exception:
-            st.error("วิเคราะห์ไม่สำเร็จ กรุณาตรวจไฟล์และการเชื่อมต่อ")
+        except Exception as exc:
+            # Surface a useful, non-secret diagnostic instead of hiding whether
+            # the failure came from the file schema or the database connection.
+            detail = str(exc).replace(str(st.secrets.get("database", {}).get("password", "")), "[ซ่อน]")
+            st.error(f"วิเคราะห์ไม่สำเร็จ: {type(exc).__name__} — {detail or 'ไม่ทราบสาเหตุ'}")
     if not st.session_state.get("cdr_errors",pd.DataFrame()).empty:
         st.dataframe(st.session_state.cdr_errors,hide_index=True)
 
@@ -237,6 +239,18 @@ with st.expander("🎥 วิเคราะห์เส้นทางจาก
                 raise ValueError("รุ่นที่ Deploy อยู่ยังไม่รองรับตัวแปลงไฟล์กล้อง กรุณารีเฟรช Deploy")
             camera_raw = read_table(camera_file.getvalue(), camera_file.name, max_rows=None)
             cameras, camera_errors = prepare_camera(camera_raw)
+            # Fill camera coordinates from the checkpoint reference table when
+            # the event file contains only the checkpoint name.
+            try:
+                ref = db.checkpoints(engine)
+                by_name = {(str(x['checkpoint_name']).strip(), str(x.get('direction') or '').strip()): x for x in ref}
+                for i, cam in cameras.iterrows():
+                    key = (str(cam.get('checkpoint') or '').strip(), str(cam.get('direction') or '').replace(' กทม.','').replace('จาก ','').strip())
+                    hit = by_name.get(key)
+                    if hit:
+                        cameras.at[i, 'lat'], cameras.at[i, 'lon'] = hit['lat'], hit['lon']
+            except Exception:
+                pass
             st.session_state.camera_rows = cameras
             st.session_state.camera_errors = camera_errors
             st.session_state.camera_map_rows = [
@@ -255,17 +269,24 @@ with st.expander("🎥 วิเคราะห์เส้นทางจาก
         cdr_events = [r for r in st.session_state.get("rows", []) if r.get("event_at") and r.get("event_type") != "CAMERA"]
         if cdr_events:
             timeline = []
+            matched_ids = set()
             for cam in cameras.to_dict("records"):
                 nearby = [r for r in cdr_events if abs((r["event_at"] - cam["camera_time"]).total_seconds()) <= camera_window*60]
                 # Prefer VOICE at the same window; DATA fills windows with no call.
                 voice = [r for r in nearby if str(r.get("event_type", "")).startswith("VOICE")]
                 selected = voice or [r for r in nearby if r.get("cdr_kind") in {"DATA", "SMS"}]
                 for r in selected:
+                    matched_ids.add(r.get("event_id"))
                     timeline.append({"เวลา": display_time(cam["camera_time"]), "กล้อง/ด่าน": cam["checkpoint"],
                                      "ทิศทาง": cam["direction"], "ประเภท": r.get("event_type"),
                                      "เวลา CDR": display_time(r["event_at"]), "LAC": r.get("lac"), "CELL": r.get("xci"),
                                      "สถานะ": "สนับสนุนโดย CDR"})
             if timeline:
+                # Keep the matched CDR rows available to the map renderer on this run.
+                st.session_state.rows = [
+                    {**row, "camera_match": row.get("event_id") in matched_ids}
+                    for row in st.session_state.get("rows", [])
+                ]
                 st.success(f"พบเหตุการณ์ใกล้เวลากล้อง {len(timeline):,} รายการ")
                 st.dataframe(pd.DataFrame(timeline), hide_index=True, width="stretch")
             else:
