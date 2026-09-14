@@ -16,6 +16,42 @@ NETWORKS = {"52001": "AIS", "52003": "AIS", "52000": "TRUE", "52004": "TRUE",
             "52005": "DTAC", "52018": "DTAC", "52002": "NT", "52015": "NT"}
 
 
+def network_label(value):
+    name = NETWORKS.get(value)
+    return f"{ {'AIS':'🟢','TRUE':'🔴','DTAC':'🔵','NT':'🟡'}[name]} {name} ({value})" if name else value
+
+
+def paired_ids(cells, lacs):
+    """Pair lines before normalization; never form a Cartesian product."""
+    def lines(value):
+        return [line.strip() for line in value.strip().splitlines()] if value.strip() else []
+    c, l = lines(cells), lines(lacs)
+    if c and l and len(c) != len(l):
+        raise ValueError("จำนวนบรรทัด CELL และ LAC ต้องเท่ากัน เพื่อจับคู่ตามบรรทัด")
+    if any(not x for x in c + l):
+        raise ValueError("มีบรรทัดว่างระหว่างรหัส กรุณาลบให้ตรงคู่ก่อนค้นหา")
+    if max(len(c), len(l)) > 200:
+        raise ValueError("ค้นหาได้ไม่เกิน 200 บรรทัดต่อครั้ง")
+    return ([identifier(x) for x in c], [identifier(x) for x in l],
+            [(identifier(a), identifier(b)) for a, b in zip(c, l)] if c and l else [])
+
+
+def display_time(value):
+    try:
+        return timestamp(value).strftime("%d/%m/%y %H:%M:%S")
+    except (ValueError, TypeError):
+        return clean(value) or "—"
+
+
+def signal_level(row):
+    value = number(row.get("rsrp"))
+    # RSRP thresholds are only applied to LTE; RSCP/NR require separate scales.
+    system = clean(row.get("system")).upper()
+    if value is None or system not in {"4", "4.0", "4G", "LTE"}:
+        return "#94a3b8", "ไม่มีเกณฑ์ / ไม่มีค่า", value
+    return ("#22c55e", "HIGH", value) if value >= -90 else (("#facc15", "MID", value) if value >= -105 else ("#ef4444", "LOW", value))
+
+
 def clean(value):
     if value is None or pd.isna(value):
         return ""
@@ -83,7 +119,7 @@ def timestamp(value):
     if year > 2400:
         year -= 543
     if year < 100:
-        raise ValueError("กรุณาใช้ปี 4 หลัก")
+        year += 2000
     return datetime(year, month, day, int(m.group(4) or 0), int(m.group(5) or 0), int(m.group(6) or 0))
 
 
@@ -163,7 +199,7 @@ def prepare_gmon(df):
     return records, pd.DataFrame(errors)
 
 
-def prepare_cdr(df):
+def prepare_cdr(df, kind="CDR", offset=0):
     require(df, ["cell id", "lac", "start date"])
     records, errors = [], []
     for index, row in df.iterrows():
@@ -174,7 +210,7 @@ def prepare_cdr(df):
             when = timestamp(row["start date"])
             gps = coordinates(row.get("latitude"), row.get("longitude"))
             # Do not retain subscriber identifiers, phone numbers, IMSI or IMEI.
-            records.append(dict(event_id=int(index) + 1, xci=cell, lac=lac, event_at=when,
+            records.append(dict(event_id=int(index) + 1 + offset, event_type=kind, xci=cell, lac=lac, event_at=when,
                                 cdr_lat=gps[0] if gps else None, cdr_lon=gps[1] if gps else None,
                                 site_name=clean(row.get("site name")),
                                 area=" · ".join(clean(row.get(k)) for k in ["sub-district", "district", "province"] if clean(row.get(k)))))
@@ -201,6 +237,8 @@ def match_cdr(events, candidates):
             output.append({**event, "lat": gps[0] if gps else None, "lon": gps[1] if gps else None,
                            "plmn": "", "xnbid": "", "source": "CDR สำรอง" if gps else "ไม่พบพิกัด",
                            "ambiguous": False, "status": "พิกัดสำรอง" if gps else "ไม่พบพิกัด"})
+        if len(output) > 200000:
+            raise ValueError("ผลจับคู่เกิน 200,000 รายการ กรุณากรองช่วงเวลา CDR ให้แคบลง ข้อมูลต้นฉบับยังอยู่ครบ")
     return output
 
 

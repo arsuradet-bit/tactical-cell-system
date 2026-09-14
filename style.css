@@ -31,4 +31,9 @@ button[kind="primary"] { color:#081722 !important; }
 .login-brand { margin:65px 0 30px; }
 .login-brand h1 { font-size:30px; }
 .login-brand p { color:#a3b5c6;font-size:14px; }
+.st-key-survey_upload { background:linear-gradient(110deg,#0d302c,#112035);border:1px solid #278a6b;border-radius:14px;padding:18px;margin:12px 0 20px; }
+.st-key-search_panel { border-top:3px solid #38bdf8;border-radius:12px; }
+.st-key-clear_search_button button { background:#42242b;color:#ffe4e6;border:1px solid #c36476; }
+textarea { font-variant-numeric:tabular-nums;line-height:1.7!important; }
+@media(max-width:700px) { [data-testid="stHorizontalBlock"] { flex-direction:column!important;gap:.75rem!important; } [data-testid="stColumn"] { width:100%!important;flex:1 1 100%!important;min-width:0!important; } .stButton button,.stFormSubmitButton button { width:100%;min-height:48px; } [data-testid="stMetric"] { margin:0;padding:12px; } }
 @media(max-width:800px) { .hero{padding:20px;display:block}.hero h1{font-size:23px}.hero-tag{border:0;padding:10px 0 0;margin:0}.brand{font-size:21px}.block-container{padding:4rem 1rem 1rem}.footer span{float:none;display:block}.section-title small{display:none} }
