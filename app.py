@@ -229,16 +229,44 @@ with st.expander("📞 วิเคราะห์ CDR · VOICE / DATA · ใช
         st.dataframe(st.session_state.cdr_errors,hide_index=True)
 
 with st.expander("🎥 วิเคราะห์เส้นทางจากกล้อง + CDR", expanded=False):
+    cv, cd = st.columns(2)
+    camera_voice = cv.file_uploader("ไฟล์ VOICE สำหรับเทียบกล้อง", type=["csv", "txt", "xlsx"], key="camera_voice")
+    camera_data = cd.file_uploader("ไฟล์ DATA สำหรับเทียบกล้อง", type=["csv", "txt", "xlsx"], key="camera_data")
+    camera_network = st.selectbox("เครือข่าย CDR สำหรับเทียบกล้อง", ["ไม่ระบุ"] + list(NETWORKS), format_func=network_label, key="camera_network")
     st.caption("อัปโหลดข้อมูลกล้องเพื่อเทียบเวลาเหตุการณ์ CDR · ชื่อด่านใช้ข้อความหลัง | · ไฟล์กล้องไม่ถูกบันทึกลงฐานข้อมูล")
     camera_file = st.file_uploader("ไฟล์กล้อง/ด่าน (CSV, XLSX)", type=["csv","txt","xlsx"], key="camera_file")
     camera_window = st.number_input("ช่วงเวลายอมรับรอบเหตุการณ์ (นาที)", min_value=1, max_value=240, value=10)
-    camera_run = st.button("จับคู่กล้องกับ CDR", type="primary", disabled=not camera_file)
+    camera_run = st.button("จับคู่กล้องกับ CDR", type="primary", disabled=not (camera_file and (camera_voice or camera_data) and (ready or DEMO)))
     if camera_run and camera_file:
         try:
+            batches, offset, errors_found = [], 0, []
+            for kind, file in [("VOICE", camera_voice), ("DATA", camera_data)]:
+                if file:
+                    raw = read_table(file.getvalue(), file.name, max_rows=None)
+                    events, errors = prepare_cdr(raw, kind=kind, offset=offset)
+                    offset += len(raw)
+                    if not events.empty:
+                        batches.append(events)
+                    if not errors.empty:
+                        errors_found.append(errors)
+            if not batches:
+                raise ValueError("ไม่พบเหตุการณ์ CDR ที่อ่านได้ในไฟล์ VOICE / DATA")
+            events = pd.concat(batches, ignore_index=True).sort_values(["event_at", "event_id"])
+            with st.spinner("กำลังค้นหาพิกัด G-Mon สำหรับ CDR ที่เทียบกล้อง…"):
+                candidates = demo_rows() if DEMO else db.lookup_pairs(engine, list(zip(events.xci, events.lac)), [] if camera_network == "ไม่ระบุ" else [camera_network])
+                if DEMO and camera_network != "ไม่ระบุ":
+                    candidates = [r for r in candidates if r["plmn"] == camera_network]
+                camera_cdr_rows = match_cdr(events, candidates)
+            if errors_found:
+                st.warning("มีแถว CDR ที่อ่านไม่ได้ กรุณาตรวจรายละเอียด")
+                st.dataframe(pd.concat(errors_found, ignore_index=True), hide_index=True)
             if prepare_camera is None:
                 raise ValueError("รุ่นที่ Deploy อยู่ยังไม่รองรับตัวแปลงไฟล์กล้อง กรุณารีเฟรช Deploy")
             camera_raw = read_table(camera_file.getvalue(), camera_file.name, max_rows=None)
             cameras, camera_errors = prepare_camera(camera_raw)
+            st.session_state.camera_cdr_rows = camera_cdr_rows
+            st.session_state.update(rows=camera_cdr_rows, mode="กล้อง + CDR", elapsed=None, notice=f"วิเคราะห์ CDR สำหรับกล้อง {len(events):,} เหตุการณ์")
+            st.session_state.revision += 1
             # Fill camera coordinates from the checkpoint reference table when
             # the event file contains only the checkpoint name.
             try:
@@ -266,7 +294,7 @@ with st.expander("🎥 วิเคราะห์เส้นทางจาก
     cameras = st.session_state.get("camera_rows", pd.DataFrame())
     if not cameras.empty:
         st.dataframe(cameras.assign(camera_time=cameras.camera_time.map(display_time)), hide_index=True, width="stretch")
-        cdr_events = [r for r in st.session_state.get("rows", []) if r.get("event_at") and r.get("event_type") != "CAMERA"]
+        cdr_events = [r for r in st.session_state.get("camera_cdr_rows", []) if r.get("event_at") and r.get("event_type") != "CAMERA"]
         if cdr_events:
             timeline = []
             matched_ids = set()
@@ -292,7 +320,7 @@ with st.expander("🎥 วิเคราะห์เส้นทางจาก
             else:
                 st.warning("ไม่พบ CDR ในช่วงเวลาที่กำหนดรอบกล้อง")
         else:
-            st.info("กรุณาวิเคราะห์ไฟล์ CDR ก่อน ระบบจะใช้เวลา CDR ประกอบกับเวลากล้อง")
+            st.info("เลือกไฟล์ VOICE หรือ DATA และไฟล์กล้องในเมนูนี้ แล้วกดจับคู่กล้องกับ CDR")
 
 with st.expander("ค้นหาพื้นที่ด้วยกรอบพิกัด"):
     with st.form("area"):
