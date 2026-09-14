@@ -234,8 +234,8 @@ def prepare_camera(df, offset=0):
         key = re.sub(r"[^a-z0-9ก-๙]+", " ", str(c).lower()).strip()
         if "ทะเบียน" in key or "อักษร" in key or "plate" in key or "license" in key: aliases[c] = "plate"
         elif "จังหวัด" in key or "province" in key: aliases[c] = "province"
-        elif "ด่าน" in key or "กล้อง" in key or "checkpoint" in key or "camera" in key: aliases[c] = "checkpoint"
         elif "เวลา" in key or "time" in key or "date" in key: aliases[c] = "camera_time"
+        elif "ด่าน" in key or "กล้อง" in key or "checkpoint" in key or "camera" in key: aliases[c] = "checkpoint"
     data = df.rename(columns=aliases)
     # Camera exports often use a blank/locale-specific header; the documented
     # four-column layout is a safe fallback when names cannot be decoded.

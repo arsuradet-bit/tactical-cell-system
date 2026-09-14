@@ -4,7 +4,7 @@ from datetime import datetime
 
 import pandas as pd
 
-from core import coordinates, identifier, match_cdr, parse_ids, plmn_value, prepare_cdr, prepare_gmon, read_table, sector_points, timestamp
+from core import coordinates, identifier, match_cdr, parse_ids, plmn_value, prepare_cdr, prepare_camera, prepare_gmon, read_table, sector_points, timestamp
 from maps import build_map
 
 
@@ -71,6 +71,23 @@ class DataTests(unittest.TestCase):
         self.assertEqual(matched[0]["event_at"].hour, 18)
         fallback = match_cdr(events, [])
         self.assertEqual(fallback[0]["source"], "CDR สำรอง")
+
+    def test_cdr_service_type_normalization(self):
+        frame = pd.DataFrame([
+            {"service type":"MOC", "cell id":"1", "lac":"2", "start date":"2026/01/01 00:00:00"},
+            {"service type":"MTC", "cell id":"1", "lac":"2", "start date":"2026/01/01 00:00:01"},
+            {"service type":"SMT", "cell id":"1", "lac":"2", "start date":"2026/01/01 00:00:02"},
+            {"service type":"SMS-MC", "cell id":"1", "lac":"2", "start date":"2026/01/01 00:00:03"},
+        ])
+        events, errors = prepare_cdr(frame)
+        self.assertTrue(errors.empty)
+        self.assertEqual(events.event_type.tolist(), ["VOICE โทรออก", "VOICE รับสาย", "SMS รับ", "SMS ส่ง"])
+
+    def test_camera_checkpoint_direction(self):
+        frame = pd.DataFrame([{"plate":"3", "province":"BKK", "checkpoint":"car|gate_out", "camera_time":"2026/07/19 18:57:44"}])
+        records, errors = prepare_camera(frame)
+        self.assertTrue(errors.empty)
+        self.assertEqual(records.iloc[0]["checkpoint"], "gate out")
 
     def test_ambiguous_plmn(self):
         events, _ = prepare_cdr(pd.DataFrame([{"cell id":"30020114", "lac":"55653", "start date":"2026/08/30 18:00:00"}]))
