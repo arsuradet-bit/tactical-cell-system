@@ -8,7 +8,11 @@ import pandas as pd
 import streamlit as st
 from streamlit_folium import st_folium
 import survey_database as db
-from core import NETWORKS, network_label, paired_ids, parse_ids, prepare_cdr, prepare_camera, prepare_gmon, read_table, match_cdr, display_time, coordinates
+from core import NETWORKS, network_label, paired_ids, parse_ids, prepare_cdr, prepare_gmon, read_table, match_cdr, display_time, coordinates
+try:
+    from core import prepare_camera
+except ImportError:
+    prepare_camera = None
 from survey_maps import build_map
 
 ROOT = Path(__file__).parent
@@ -228,6 +232,8 @@ with st.expander("🎥 วิเคราะห์เส้นทางจาก
     camera_run = st.button("จับคู่กล้องกับ CDR", type="primary", disabled=not camera_file)
     if camera_run and camera_file:
         try:
+            if prepare_camera is None:
+                raise ValueError("รุ่นที่ Deploy อยู่ยังไม่รองรับตัวแปลงไฟล์กล้อง กรุณารีเฟรช Deploy")
             camera_raw = read_table(camera_file.getvalue(), camera_file.name, max_rows=None)
             cameras, camera_errors = prepare_camera(camera_raw)
             st.session_state.camera_rows = cameras
