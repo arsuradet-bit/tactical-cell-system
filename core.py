@@ -210,7 +210,15 @@ def prepare_cdr(df, kind="CDR", offset=0):
             when = timestamp(row["start date"])
             gps = coordinates(row.get("latitude"), row.get("longitude"))
             # Do not retain subscriber identifiers, phone numbers, IMSI or IMEI.
-            records.append(dict(event_id=int(index) + 1 + offset, event_type=kind, xci=cell, lac=lac, event_at=when,
+            raw_service = clean(row.get("service type"))
+            service = raw_service.upper().replace("_", "-")
+            if service in {"SMT", "SMS-MT"}: event_type = "SMS รับ"
+            elif service in {"SMS-MC"}: event_type = "SMS ส่ง"
+            elif service in {"MOC", "MC"}: event_type = "VOICE โทรออก"
+            elif service in {"MTC", "MT"}: event_type = "VOICE รับสาย"
+            else: event_type = kind
+            records.append(dict(event_id=int(index) + 1 + offset, event_type=event_type, cdr_kind=kind,
+                                service_type=raw_service, xci=cell, lac=lac, event_at=when,
                                 cdr_lat=gps[0] if gps else None, cdr_lon=gps[1] if gps else None,
                                 site_name=clean(row.get("site name")),
                                 area=" · ".join(clean(row.get(k)) for k in ["sub-district", "district", "province"] if clean(row.get(k)))))

@@ -172,9 +172,10 @@ with st.container(border=True, key="search_panel"):
 
 with st.expander("📞 วิเคราะห์ CDR · VOICE / DATA · ใช้ชั่วคราว"):
     st.caption("จับคู่ทุกพิกัด G-Mon ด้วย LAC/CELL · ใช้พิกัด CDR เมื่อไม่พบ G-Mon · ไม่บันทึก CDR ลงฐานข้อมูล")
-    a, b = st.columns(2)
+    a, b, c = st.columns(3)
     voice = a.file_uploader("ไฟล์ VOICE", type=["csv","txt","xlsx"], key=f"voice_{st.session_state.cdr_generation}")
     data = b.file_uploader("ไฟล์ DATA", type=["csv","txt","xlsx"], key=f"data_{st.session_state.cdr_generation}")
+    sms = c.file_uploader("ไฟล์ SMS", type=["csv","txt","xlsx"], key=f"sms_{st.session_state.cdr_generation}")
     with st.form("cdr_options"):
         cdr_network = st.selectbox("เครือข่ายของ CDR", ["ไม่ระบุ"]+list(NETWORKS), format_func=network_label)
         filter_time = st.checkbox("กรองช่วงเวลาเหตุการณ์")
@@ -190,7 +191,7 @@ with st.expander("📞 วิเคราะห์ CDR · VOICE / DATA · ใช
             if not voice and not data:
                 raise ValueError("เลือกไฟล์ VOICE หรือ DATA อย่างน้อยหนึ่งไฟล์")
             batches, all_errors, offset = [], [], 0
-            for kind, file in [("VOICE",voice),("DATA",data)]:
+            for kind, file in [("VOICE",voice),("DATA",data),("SMS",sms)]:
                 if file:
                     raw = read_table(file.getvalue(), file.name, max_rows=None)
                     events, errors = prepare_cdr(raw, kind=kind, offset=offset)
@@ -247,14 +248,14 @@ with st.expander("🎥 วิเคราะห์เส้นทางจาก
     cameras = st.session_state.get("camera_rows", pd.DataFrame())
     if not cameras.empty:
         st.dataframe(cameras.assign(camera_time=cameras.camera_time.map(display_time)), hide_index=True, width="stretch")
-        cdr_events = [r for r in st.session_state.get("rows", []) if r.get("event_type") in {"VOICE","DATA"} and r.get("event_at")]
+        cdr_events = [r for r in st.session_state.get("rows", []) if r.get("event_at") and r.get("event_type") != "CAMERA"]
         if cdr_events:
             timeline = []
             for cam in cameras.to_dict("records"):
                 nearby = [r for r in cdr_events if abs((r["event_at"] - cam["camera_time"]).total_seconds()) <= camera_window*60]
                 # Prefer VOICE at the same window; DATA fills windows with no call.
-                voice = [r for r in nearby if r.get("event_type") == "VOICE"]
-                selected = voice or [r for r in nearby if r.get("event_type") == "DATA"]
+                voice = [r for r in nearby if str(r.get("event_type", "")).startswith("VOICE")]
+                selected = voice or [r for r in nearby if r.get("cdr_kind") in {"DATA", "SMS"}]
                 for r in selected:
                     timeline.append({"เวลา": display_time(cam["camera_time"]), "กล้อง/ด่าน": cam["checkpoint"],
                                      "ทิศทาง": cam["direction"], "ประเภท": r.get("event_type"),
