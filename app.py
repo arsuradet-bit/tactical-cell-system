@@ -17,7 +17,7 @@ except ImportError:
 from survey_maps import build_map
 
 ROOT = Path(__file__).parent
-st.set_page_config(page_title="วิเคราะห์พิกัด", page_icon=str(ROOT/"logo-transparent.png") if (ROOT/"logo-transparent.png").exists() else "📍", layout="wide")
+st.set_page_config(page_title="วิเคราะห์พิกัด", page_icon=str(ROOT/"logo-transparent.png") if (ROOT/"logo-transparent.png").exists() else "📍", layout="wide", initial_sidebar_state="expanded")
 for name in ("fonts.css", "style.css"):
     st.markdown('<style>' + (ROOT/name).read_text(encoding="utf-8") + '</style>', unsafe_allow_html=True)
 DEMO = os.getenv("INTEL_DEMO") == "1"
@@ -93,14 +93,20 @@ for key, default in {"rows": [], "mode": "ค้นหา", "revision": 0, "cdr_
     if key not in st.session_state:
         st.session_state[key] = default
 
-left, right = st.columns([5, 2])
-with left:
+with st.sidebar:
     if (ROOT/"logo-transparent.png").exists():
-        st.image(str(ROOT/"logo-transparent.png"), width=72)
+        st.image(str(ROOT/"logo-transparent.png"), width=68)
     st.markdown('<div class="eyebrow">FIELD INTELLIGENCE</div><div class="brand">วิเคราะห์พิกัด</div>', unsafe_allow_html=True)
-with right:
+    st.caption("ระบบวิเคราะห์ภาคสนาม")
+    workspace_menu = st.radio("เมนูหลัก", ["🔎 ค้นหา LAC / CELL / xNBID", "📥 เพิ่มข้อมูล G-Mon", "📞 วิเคราะห์ CDR", "🎥 กล้อง + CDR", "🗺️ ค้นหาพื้นที่"], key="workspace_menu", label_visibility="collapsed")
+    st.divider()
     st.caption("● Cloud SQL พร้อมใช้งาน" if ready else "○ ตัวอย่างสังเคราะห์" if DEMO else "○ Cloud SQL ยังไม่พร้อม")
     st.button("ออกจากระบบ", on_click=logout, width="stretch")
+active_panel = {"🔎 ค้นหา LAC / CELL / xNBID": "search_panel", "📥 เพิ่มข้อมูล G-Mon": "survey_upload", "📞 วิเคราะห์ CDR": "cdr_panel", "🎥 กล้อง + CDR": "camera_panel", "🗺️ ค้นหาพื้นที่": "area_panel"}[workspace_menu]
+# Keep upload widgets mounted when navigating, so session-only files survive.
+hidden_panels = [name for name in ("search_panel", "survey_upload", "cdr_panel", "camera_panel", "area_panel") if name != active_panel]
+st.markdown("<style>" + ",".join(".st-key-" + name for name in hidden_panels) + "{display:none}</style>", unsafe_allow_html=True)
+st.markdown("## " + workspace_menu)
 if DEMO:
     st.info("ข้อมูลสังเคราะห์สำหรับทดสอบ · ไม่บันทึกฐานข้อมูล")
 elif not ready:
@@ -171,7 +177,8 @@ with st.container(border=True, key="search_panel"):
         except Exception:
             st.error("ค้นหาไม่สำเร็จ กรุณาตรวจการเชื่อมต่อแล้วลองใหม่")
 
-with st.expander("📞 วิเคราะห์ CDR · VOICE / DATA · ใช้ชั่วคราว"):
+with st.container(key="cdr_panel"):
+    st.caption("VOICE / DATA · ใช้ชั่วคราว")
     st.caption("จับคู่ทุกพิกัด G-Mon ด้วย LAC/CELL · ใช้พิกัด CDR เมื่อไม่พบ G-Mon · ไม่บันทึก CDR ลงฐานข้อมูล")
     a, b = st.columns(2)
     voice = a.file_uploader("ไฟล์ VOICE", type=["csv","txt","xlsx"], key=f"voice_{st.session_state.cdr_generation}")
@@ -229,7 +236,7 @@ with st.expander("📞 วิเคราะห์ CDR · VOICE / DATA · ใช
     if not st.session_state.get("cdr_errors",pd.DataFrame()).empty:
         st.dataframe(st.session_state.cdr_errors,hide_index=True)
 
-with st.expander("🎥 วิเคราะห์เส้นทางจากกล้อง + CDR", expanded=False):
+with st.container(key="camera_panel"):
     cv, cd = st.columns(2)
     camera_voice = cv.file_uploader("ไฟล์ VOICE สำหรับเทียบกล้อง", type=["csv", "txt", "xlsx"], key="camera_voice")
     camera_data = cd.file_uploader("ไฟล์ DATA สำหรับเทียบกล้อง", type=["csv", "txt", "xlsx"], key="camera_data")
@@ -351,7 +358,7 @@ with st.expander("🎥 วิเคราะห์เส้นทางจาก
         else:
             st.info("เลือกไฟล์ VOICE หรือ DATA และไฟล์กล้องในเมนูนี้ แล้วกดจับคู่กล้องกับ CDR")
 
-with st.expander("ค้นหาพื้นที่ด้วยกรอบพิกัด"):
+with st.container(key="area_panel"):
     with st.form("area"):
         a,b = st.columns(2)
         south = a.number_input("ใต้",-90.,90.,6.9,format="%.5f")
