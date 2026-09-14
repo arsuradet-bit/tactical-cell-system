@@ -2,6 +2,7 @@ from __future__ import annotations
 import hmac
 import os
 import time
+from io import BytesIO
 from datetime import datetime, date, time as day_time
 from pathlib import Path
 import pandas as pd
@@ -243,7 +244,7 @@ with st.expander("🎥 วิเคราะห์เส้นทางจาก
             for kind, file in [("VOICE", camera_voice), ("DATA", camera_data)]:
                 if file:
                     raw = read_table(file.getvalue(), file.name, max_rows=None)
-                    events, errors = prepare_cdr(raw, kind=kind, offset=offset)
+                    events, errors = prepare_cdr(raw, kind=kind, offset=offset, interpret_service=True)
                     offset += len(raw)
                     if not events.empty:
                         batches.append(events)
@@ -305,10 +306,14 @@ with st.expander("🎥 วิเคราะห์เส้นทางจาก
                 selected = voice or [r for r in nearby if r.get("cdr_kind") in {"DATA", "SMS"}]
                 for r in selected:
                     matched_ids.add(r.get("event_id"))
-                    timeline.append({"เวลา": display_time(cam["camera_time"]), "กล้อง/ด่าน": cam["checkpoint"],
+                    timeline.append({"เวลา": cam["camera_time"], "ทะเบียน": cam.get("plate"), "จังหวัด": cam.get("province"), "กล้อง/ด่าน": cam["checkpoint"],
                                      "ทิศทาง": cam["direction"], "ประเภท": r.get("event_type"),
-                                     "เวลา CDR": display_time(r["event_at"]), "LAC": r.get("lac"), "CELL": r.get("xci"),
-                                     "สถานะ": "สนับสนุนโดย CDR"})
+                                     "Service Type": r.get("service_type"), "กิจกรรม": r.get("activity"),
+                                     "เวลา CDR": r["event_at"], "LAC": r.get("lac"), "CELL": r.get("xci"),
+                                     "ต่างจากเวลากล้อง (วินาที)": (r["event_at"]-cam["camera_time"]).total_seconds(),
+                                     "ละติจูดกล้อง": cam.get("lat"), "ลองจิจูดกล้อง": cam.get("lon"),
+                                     "ละติจูด CDR/G-Mon": r.get("lat"), "ลองจิจูด CDR/G-Mon": r.get("lon"),
+                                     "แหล่งพิกัด": r.get("source"), "สถานะ": "เวลาใกล้เคียง ไม่ยืนยันการผ่านกล้อง"})
             if timeline:
                 # Keep the matched CDR rows available to the map renderer on this run.
                 st.session_state.rows = [
@@ -316,7 +321,31 @@ with st.expander("🎥 วิเคราะห์เส้นทางจาก
                     for row in st.session_state.get("rows", [])
                 ]
                 st.success(f"พบเหตุการณ์ใกล้เวลากล้อง {len(timeline):,} รายการ")
-                st.dataframe(pd.DataFrame(timeline), hide_index=True, width="stretch")
+                timeline_table = pd.DataFrame(timeline).sort_values(["เวลา", "เวลา CDR"], kind="stable")
+                st.dataframe(timeline_table, hide_index=True, width="stretch")
+                excel_buffer = BytesIO()
+                with pd.ExcelWriter(excel_buffer, engine="openpyxl", datetime_format="DD/MM/YYYY HH:MM:SS") as writer:
+                    timeline_table.to_excel(writer, sheet_name="ไทม์ไลน์จับคู่", index=False)
+                    pd.DataFrame({"เงื่อนไข": ["ช่วงเวลารอบกล้อง (นาที)", "การเลือกประเภท", "ความหมายผลลัพธ์"],
+                                  "ค่า": [str(camera_window), "VOICE ก่อน DATA ในช่วงเวลาที่เลือก", "จับคู่ตามเวลา ไม่ยืนยันตำแหน่งโทรศัพท์หรือการผ่านกล้อง"]}).to_excel(writer, sheet_name="เงื่อนไข", index=False)
+                    from openpyxl.styles import Font, PatternFill
+                    from openpyxl.utils import get_column_letter
+                    for sheet in writer.book.worksheets:
+                        sheet.freeze_panes = "A2"
+                        sheet.auto_filter.ref = sheet.dimensions
+                        for cell in sheet[1]:
+                            cell.font = Font(bold=True, color="FFFFFF")
+                            cell.fill = PatternFill("solid", fgColor="14263D")
+                        for column in sheet.columns:
+                            sheet.column_dimensions[get_column_letter(column[0].column)].width = min(65, max(23, max(len(str(c.value or "")) for c in column)+2))
+                            for cell in column[1:]:
+                                if isinstance(cell.value, str):
+                                    cell.data_type = "s"
+                                elif isinstance(cell.value, datetime):
+                                    cell.number_format = "dd/mm/yyyy hh:mm:ss"
+                st.download_button("📥 ส่งออกไทม์ไลน์ Excel", data=excel_buffer.getvalue(),
+                                   file_name="camera_cdr_timeline.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                                   key="export_camera_timeline")
             else:
                 st.warning("ไม่พบ CDR ในช่วงเวลาที่กำหนดรอบกล้อง")
         else:

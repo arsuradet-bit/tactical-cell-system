@@ -199,7 +199,7 @@ def prepare_gmon(df):
     return records, pd.DataFrame(errors)
 
 
-def prepare_cdr(df, kind="CDR", offset=0):
+def prepare_cdr(df, kind="CDR", offset=0, interpret_service=False):
     require(df, ["cell id", "lac", "start date"])
     records, errors = [], []
     for index, row in df.iterrows():
@@ -213,7 +213,12 @@ def prepare_cdr(df, kind="CDR", offset=0):
             # the sole source of truth: every row in a VOICE file is VOICE,
             # and every row in a DATA file is DATA.
             cdr_kind = str(kind or "CDR").upper()
+            service = clean(row.get("service type")).upper() if interpret_service else ""
+            activity = {"MOC": "โทรออก", "MC": "โทรออก", "SMS-MC": "โทรออก",
+                        "MTC": "รับสาย", "MT": "รับสาย", "SMS-MT": "รับสาย",
+                        "SMT": "ข้อความ"}.get(service, "ไม่ระบุ" if service else cdr_kind)
             records.append(dict(event_id=int(index) + 1 + offset, event_type=cdr_kind, cdr_kind=cdr_kind,
+                                service_type=service, activity=activity,
                                 xci=cell, lac=lac, event_at=when,
                                 cdr_lat=gps[0] if gps else None, cdr_lon=gps[1] if gps else None,
                                 site_name=clean(row.get("site name")),
