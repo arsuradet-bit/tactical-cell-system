@@ -345,7 +345,10 @@ with st.expander("ตั้งค่าการแสดงผลแผนท�
             st.warning("ทิศต้องตั้งแต่ 0 ถึงน้อยกว่า 360 องศา")
     if sector and (bearing is None or len(valid)>500):
         st.info("กรอกทิศจำลอง และค้นหาไม่เกิน 500 จุดเพื่อเปิดรูปพัด")
-map_obj = build_map(rows,sector=sector,bearing=bearing,radius=radius,beam=beam,path=playback and st.session_state.mode=="CDR")
+timeline_enabled = playback and st.session_state.mode == "CDR" and len(rows) <= 2000
+if playback and st.session_state.mode == "CDR" and len(rows) > 2000:
+    st.info("ผลลัพธ์มีจำนวนมาก จึงแสดงจุดทั้งหมดบนแผนที่และปิดตัวควบคุมไทม์ไลน์ชั่วคราวเพื่อความเสถียร")
+map_obj = build_map(rows,sector=sector,bearing=bearing,radius=radius,beam=beam,path=timeline_enabled)
 st_folium(map_obj,height=620,use_container_width=True,key=f"map_{st.session_state.revision}",returned_objects=[])
 st.caption("จุด G-Mon คือจุดตรวจพบสัญญาณ ไม่ใช่ตำแหน่งเสาจริง · ไทม์ไลน์เน้นทุกจุดของเหตุการณ์โดยไม่เลือกตำแหน่งโทรศัพท์เอง")
 if st.session_state.elapsed is not None:
