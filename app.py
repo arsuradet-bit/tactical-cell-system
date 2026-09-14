@@ -8,7 +8,7 @@ import pandas as pd
 import streamlit as st
 from streamlit_folium import st_folium
 import survey_database as db
-from core import NETWORKS, network_label, paired_ids, parse_ids, prepare_cdr, prepare_gmon, read_table, match_cdr, display_time, coordinates
+from core import NETWORKS, network_label, paired_ids, parse_ids, prepare_cdr, prepare_camera, prepare_gmon, read_table, match_cdr, display_time, coordinates
 from survey_maps import build_map
 
 ROOT = Path(__file__).parent
@@ -188,7 +188,7 @@ with st.expander("📞 วิเคราะห์ CDR · VOICE / DATA · ใช
             batches, all_errors, offset = [], [], 0
             for kind, file in [("VOICE",voice),("DATA",data)]:
                 if file:
-                    raw = read_table(file.getvalue(), file.name)
+                    raw = read_table(file.getvalue(), file.name, max_rows=None)
                     events, errors = prepare_cdr(raw, kind=kind, offset=offset)
                     offset += len(raw)
                     if not events.empty:
@@ -205,8 +205,8 @@ with st.expander("📞 วิเคราะห์ CDR · VOICE / DATA · ใช
                 if start > end:
                     raise ValueError("เวลาเริ่มต้องไม่เกินเวลาสิ้นสุด")
                 events = events[events.event_at.between(start,end)]
-            if events.empty or len(events)>5000:
-                raise ValueError("ต้องมี 1–5,000 เหตุการณ์ กรุณาตรวจหรือกรองช่วงเวลา")
+            if events.empty:
+                raise ValueError("ไม่พบเหตุการณ์ในช่วงเวลาที่เลือก กรุณาตรวจช่วงเวลาหรือปิดตัวกรองเวลา")
             with st.spinner("กำลังจับคู่ทุกจุด G-Mon…"):
                 candidates = demo_rows() if DEMO else db.lookup_pairs(engine,list(zip(events.xci,events.lac)),[] if cdr_network == "ไม่ระบุ" else [cdr_network])
                 if DEMO and cdr_network != "ไม่ระบุ":
@@ -220,6 +220,47 @@ with st.expander("📞 วิเคราะห์ CDR · VOICE / DATA · ใช
             st.error("วิเคราะห์ไม่สำเร็จ กรุณาตรวจไฟล์และการเชื่อมต่อ")
     if not st.session_state.get("cdr_errors",pd.DataFrame()).empty:
         st.dataframe(st.session_state.cdr_errors,hide_index=True)
+
+with st.expander("🎥 วิเคราะห์เส้นทางจากกล้อง + CDR", expanded=False):
+    st.caption("อัปโหลดข้อมูลกล้องเพื่อเทียบเวลาเหตุการณ์ CDR · ชื่อด่านใช้ข้อความหลัง | · ไฟล์กล้องไม่ถูกบันทึกลงฐานข้อมูล")
+    camera_file = st.file_uploader("ไฟล์กล้อง/ด่าน (CSV, XLSX)", type=["csv","txt","xlsx"], key="camera_file")
+    camera_window = st.number_input("ช่วงเวลายอมรับรอบเหตุการณ์ (นาที)", min_value=1, max_value=240, value=10)
+    camera_run = st.button("จับคู่กล้องกับ CDR", type="primary", disabled=not camera_file)
+    if camera_run and camera_file:
+        try:
+            camera_raw = read_table(camera_file.getvalue(), camera_file.name, max_rows=None)
+            cameras, camera_errors = prepare_camera(camera_raw)
+            st.session_state.camera_rows = cameras
+            st.session_state.camera_errors = camera_errors
+            if cameras.empty:
+                st.warning("ไม่พบรายการกล้องที่อ่านได้")
+            else:
+                st.success(f"อ่านข้อมูลกล้องได้ {len(cameras):,} รายการ")
+        except Exception as exc:
+            st.error(f"อ่านไฟล์กล้องไม่สำเร็จ: {exc}")
+    cameras = st.session_state.get("camera_rows", pd.DataFrame())
+    if not cameras.empty:
+        st.dataframe(cameras.assign(camera_time=cameras.camera_time.map(display_time)), hide_index=True, width="stretch")
+        cdr_events = [r for r in st.session_state.get("rows", []) if r.get("event_type") in {"VOICE","DATA"} and r.get("event_at")]
+        if cdr_events:
+            timeline = []
+            for cam in cameras.to_dict("records"):
+                nearby = [r for r in cdr_events if abs((r["event_at"] - cam["camera_time"]).total_seconds()) <= camera_window*60]
+                # Prefer VOICE at the same window; DATA fills windows with no call.
+                voice = [r for r in nearby if r.get("event_type") == "VOICE"]
+                selected = voice or [r for r in nearby if r.get("event_type") == "DATA"]
+                for r in selected:
+                    timeline.append({"เวลา": display_time(cam["camera_time"]), "กล้อง/ด่าน": cam["checkpoint"],
+                                     "ทิศทาง": cam["direction"], "ประเภท": r.get("event_type"),
+                                     "เวลา CDR": display_time(r["event_at"]), "LAC": r.get("lac"), "CELL": r.get("xci"),
+                                     "สถานะ": "สนับสนุนโดย CDR"})
+            if timeline:
+                st.success(f"พบเหตุการณ์ใกล้เวลากล้อง {len(timeline):,} รายการ")
+                st.dataframe(pd.DataFrame(timeline), hide_index=True, width="stretch")
+            else:
+                st.warning("ไม่พบ CDR ในช่วงเวลาที่กำหนดรอบกล้อง")
+        else:
+            st.info("กรุณาวิเคราะห์ไฟล์ CDR ก่อน ระบบจะใช้เวลา CDR ประกอบกับเวลากล้อง")
 
 with st.expander("ค้นหาพื้นที่ด้วยกรอบพิกัด"):
     with st.form("area"):

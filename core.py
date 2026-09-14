@@ -123,7 +123,7 @@ def timestamp(value):
     return datetime(year, month, day, int(m.group(4) or 0), int(m.group(5) or 0), int(m.group(6) or 0))
 
 
-def read_table(data: bytes, filename: str):
+def read_table(data: bytes, filename: str, max_rows=100000):
     if len(data) > 20 * 1024 * 1024:
         raise ValueError("ไฟล์ต้องไม่เกิน 20 MB")
     if filename.lower().endswith(".xlsx"):
@@ -156,7 +156,7 @@ def read_table(data: bytes, filename: str):
     df = df.loc[:, [c for c in df.columns if not (c.startswith("unnamed:") and df[c].map(clean).eq("").all())]]
     if df.empty:
         raise ValueError("ไฟล์ไม่มีรายการข้อมูล")
-    if len(df) > 100000:
+    if max_rows is not None and len(df) > max_rows:
         raise ValueError("ไฟล์หนึ่งรองรับไม่เกิน 100,000 แถว กรุณาแบ่งไฟล์")
     return df
 
@@ -219,6 +219,42 @@ def prepare_cdr(df, kind="CDR", offset=0):
     return pd.DataFrame(records), pd.DataFrame(errors)
 
 
+def prepare_camera(df, offset=0):
+    """Normalize checkpoint/camera exports without requiring one vendor schema."""
+    aliases = {}
+    for c in df.columns:
+        key = re.sub(r"[^a-z0-9ก-๙]+", " ", str(c).lower()).strip()
+        if "ทะเบียน" in key or "อักษร" in key or "plate" in key or "license" in key: aliases[c] = "plate"
+        elif "จังหวัด" in key or "province" in key: aliases[c] = "province"
+        elif "ด่าน" in key or "กล้อง" in key or "checkpoint" in key or "camera" in key: aliases[c] = "checkpoint"
+        elif "เวลา" in key or "time" in key or "date" in key: aliases[c] = "camera_time"
+    data = df.rename(columns=aliases)
+    # Camera exports often use a blank/locale-specific header; the documented
+    # four-column layout is a safe fallback when names cannot be decoded.
+    if any(c not in data.columns for c in ("plate", "checkpoint", "camera_time")) and len(data.columns) >= 4:
+        positional = list(data.columns[:4])
+        for source, target in zip(positional, ("plate", "province", "checkpoint", "camera_time")):
+            if target not in data.columns: data = data.rename(columns={source: target})
+    if "checkpoint" not in data.columns and len(df.columns) >= 3:
+        data["checkpoint"] = df.iloc[:, 2]
+    required = ["plate", "checkpoint", "camera_time"]
+    missing = [c for c in required if c not in data.columns]
+    if missing: raise ValueError("ไฟล์กล้องขาดคอลัมน์: " + ", ".join(missing))
+    records, errors = [], []
+    for index, row in data.iterrows():
+        try:
+            raw_checkpoint = clean(row.get("checkpoint"))
+            checkpoint = raw_checkpoint.split("|", 1)[1].strip() if "|" in raw_checkpoint else raw_checkpoint
+            direction = "เข้า กทม." if re.search(r"(?:_|\s)เข้า$", checkpoint, re.I) else ("ออกจาก กทม." if re.search(r"(?:_|\s)ออก$", checkpoint, re.I) else "")
+            base = re.sub(r"(?:_|\s)(?:เข้า|ออก)$", "", checkpoint, flags=re.I).replace("_", " ").strip()
+            records.append(dict(camera_id=int(index)+1+offset, event_type="CAMERA", plate=clean(row.get("plate")),
+                                province=clean(row.get("province")), checkpoint=base, direction=direction,
+                                camera_time=timestamp(clean(row.get("camera_time")))))
+        except (ValueError, TypeError) as exc:
+            errors.append({"แถวข้อมูล": int(index)+1, "ปัญหา": str(exc)})
+    return pd.DataFrame(records), pd.DataFrame(errors)
+
+
 def match_cdr(events, candidates):
     groups = {}
     for row in candidates:
@@ -237,8 +273,6 @@ def match_cdr(events, candidates):
             output.append({**event, "lat": gps[0] if gps else None, "lon": gps[1] if gps else None,
                            "plmn": "", "xnbid": "", "source": "CDR สำรอง" if gps else "ไม่พบพิกัด",
                            "ambiguous": False, "status": "พิกัดสำรอง" if gps else "ไม่พบพิกัด"})
-        if len(output) > 200000:
-            raise ValueError("ผลจับคู่เกิน 200,000 รายการ กรุณากรองช่วงเวลา CDR ให้แคบลง ข้อมูลต้นฉบับยังอยู่ครบ")
     return output
 
 

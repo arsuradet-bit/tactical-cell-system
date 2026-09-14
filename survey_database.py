@@ -70,7 +70,13 @@ def search(engine, cells=(), lacs=(), nbids=(), plmns=(), bounds=None, limit=100
 
 
 def lookup_pairs(engine, pairs, plmns=()):
-    return search(engine, pairs=list(dict.fromkeys(pairs)), plmns=plmns)[0] if pairs else []
+    unique_pairs = list(dict.fromkeys(pairs))
+    results = []
+    # Bound SQL size, not the number of CDR events. Canonicalize before batching.
+    unique_pairs = list(dict.fromkeys((identifier(c), identifier(l)) for c, l in unique_pairs))
+    for start in range(0, len(unique_pairs), 300):
+        results.extend(search(engine, pairs=unique_pairs[start:start+300], plmns=plmns)[0])
+    return results
 
 
 def save_raw(engine, frame):
