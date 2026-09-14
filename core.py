@@ -30,8 +30,6 @@ def paired_ids(cells, lacs):
         raise ValueError("จำนวนบรรทัด CELL และ LAC ต้องเท่ากัน เพื่อจับคู่ตามบรรทัด")
     if any(not x for x in c + l):
         raise ValueError("มีบรรทัดว่างระหว่างรหัส กรุณาลบให้ตรงคู่ก่อนค้นหา")
-    if max(len(c), len(l)) > 200:
-        raise ValueError("ค้นหาได้ไม่เกิน 200 บรรทัดต่อครั้ง")
     return ([identifier(x) for x in c], [identifier(x) for x in l],
             [(identifier(a), identifier(b)) for a, b in zip(c, l)] if c and l else [])
 
@@ -84,8 +82,6 @@ def plmn_value(value):
 def parse_ids(value):
     tokens = re.split(r"[\s,;]+", clean(value))
     values = list(dict.fromkeys(identifier(t) for t in tokens if t))
-    if len(values) > 200:
-        raise ValueError("ค้นหาได้ไม่เกิน 200 รหัสต่อช่อง")
     return values
 
 
@@ -124,8 +120,6 @@ def timestamp(value):
 
 
 def read_table(data: bytes, filename: str, max_rows=100000):
-    if len(data) > 20 * 1024 * 1024:
-        raise ValueError("ไฟล์ต้องไม่เกิน 20 MB")
     if filename.lower().endswith(".xlsx"):
         sheets = pd.read_excel(io.BytesIO(data), sheet_name=None, dtype=str, keep_default_na=False)
         frames = [frame for frame in sheets.values() if not frame.empty]
@@ -161,8 +155,6 @@ def read_table(data: bytes, filename: str, max_rows=100000):
     df = df.loc[:, [c for c in df.columns if not (c.startswith("unnamed:") and df[c].map(clean).eq("").all())]]
     if df.empty:
         raise ValueError("ไฟล์ไม่มีรายการข้อมูล")
-    if max_rows is not None and len(df) > max_rows:
-        raise ValueError("ไฟล์หนึ่งรองรับไม่เกิน 100,000 แถว กรุณาแบ่งไฟล์")
     return df
 
 
