@@ -30,8 +30,19 @@ def build_map(rows, center=None, zoom=7, fit=True, sector=False, bearing=None,
                 f"{gps[0]:.6f}, {gps[1]:.6f}",
                 f"RSRP/RSCP: {esc(value)} dBm · {esc(level)}",
                 "สำรวจ: " + esc(display_time(row.get("observed_at")))])
-            records[key] = {"gps": list(gps), "color": color, "popup": popup,
-                            "label": "CELL " + str(row.get("xci")), "index": len(records)}
+            kind = str(row.get("cdr_kind") or "").upper()
+            event_type = str(row.get("event_type") or "").upper()
+            if kind == "VOICE" or event_type.startswith("VOICE"):
+                marker_type, marker_color, marker_symbol = "VOICE", "#ef4444", "☎"
+            elif kind == "DATA":
+                marker_type, marker_color, marker_symbol = "DATA", "#2563eb", "📡"
+            elif kind == "SMS" or event_type.startswith("SMS"):
+                marker_type, marker_color, marker_symbol = "SMS", "#a855f7", "✉"
+            else:
+                marker_type, marker_color, marker_symbol = "GMON", color, ""
+            records[key] = {"gps": list(gps), "color": marker_color, "popup": popup,
+                            "label": (marker_type + " · " if marker_type != "GMON" else "") + "CELL " + str(row.get("xci")),
+                            "marker_type": marker_type, "marker_symbol": marker_symbol, "index": len(records)}
             points.append(gps)
         if event_id is not None:
             events[event_id]["members"].append(records[key]["index"])
@@ -51,7 +62,9 @@ def build_map(rows, center=None, zoom=7, fit=True, sector=False, bearing=None,
       const map={{this._parent.get_name()}}, data={{this.data|tojson}}, events={{this.events|tojson}};
       const renderer=L.canvas({padding:.5}), dots=[], group=L.featureGroup().addTo(map);
       data.forEach(p=>{
-        const dot=L.circleMarker(p.gps,{renderer:renderer,radius:5,color:'#fff',weight:1,fillColor:p.color,fillOpacity:.9}).addTo(group);
+        let dot;
+        if(p.marker_type==='GMON') dot=L.circleMarker(p.gps,{renderer:renderer,radius:5,color:'#fff',weight:1,fillColor:p.color,fillOpacity:.9}).addTo(group);
+        else { const icon=L.divIcon({className:'intel-event-marker',html:'<span style="display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:50%;background:'+p.color+';border:2px solid #fff;color:#fff;font-size:14px;box-shadow:0 1px 4px #000">'+p.marker_symbol+'</span>',iconSize:[24,24],iconAnchor:[12,12]}); dot=L.marker(p.gps,{icon}).addTo(group); }
         dot.bindTooltip(p.label); dot.bindPopup(()=>p.popup); dots.push(dot);
       });
       {{this.sectors|tojson}}.forEach(p=>L.polygon(p,{color:'#38bdf8',weight:1,fillOpacity:.08}).bindTooltip('Sector จำลอง').addTo(map));
