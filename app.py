@@ -239,6 +239,10 @@ with st.expander("🎥 วิเคราะห์เส้นทางจาก
             cameras, camera_errors = prepare_camera(camera_raw)
             st.session_state.camera_rows = cameras
             st.session_state.camera_errors = camera_errors
+            st.session_state.camera_map_rows = [
+                {**r, "observed_at": r.get("camera_time"), "source": "กล้อง", "xci": None, "lac": None, "xnbid": None}
+                for r in cameras.to_dict("records") if coordinates(r.get("lat"), r.get("lon"))
+            ]
             if cameras.empty:
                 st.warning("ไม่พบรายการกล้องที่อ่านได้")
             else:
@@ -290,6 +294,7 @@ with st.expander("ค้นหาพื้นที่ด้วยกรอบ�
             st.error("ค้นหาพื้นที่ไม่สำเร็จ กรุณาตรวจการเชื่อมต่อ")
 
 rows = st.session_state.rows
+rows = rows + st.session_state.get("camera_map_rows", [])
 if st.session_state.notice:
     st.success(st.session_state.notice)
 valid = [r for r in rows if coordinates(r.get("lat"),r.get("lon"))]

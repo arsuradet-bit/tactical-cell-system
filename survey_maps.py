@@ -38,6 +38,8 @@ def build_map(rows, center=None, zoom=7, fit=True, sector=False, bearing=None,
                 marker_type, marker_color, marker_symbol = "DATA", "#2563eb", "📡"
             elif kind == "SMS" or event_type.startswith("SMS"):
                 marker_type, marker_color, marker_symbol = "SMS", "#a855f7", "✉"
+            elif event_type == "CAMERA":
+                marker_type, marker_color, marker_symbol = "กล้อง", "#f59e0b", "📷"
             else:
                 marker_type, marker_color, marker_symbol = "GMON", color, ""
             records[key] = {"gps": list(gps), "color": marker_color, "popup": popup,

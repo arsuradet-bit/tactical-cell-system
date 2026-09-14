@@ -234,6 +234,8 @@ def prepare_camera(df, offset=0):
         key = re.sub(r"[^a-z0-9ก-๙]+", " ", str(c).lower()).strip()
         if "ทะเบียน" in key or "อักษร" in key or "plate" in key or "license" in key: aliases[c] = "plate"
         elif "จังหวัด" in key or "province" in key: aliases[c] = "province"
+        elif "ละติจูด" in key or "latitude" in key or key in {"lat", "พิกัด lat"}: aliases[c] = "lat"
+        elif "ลองจิจูด" in key or "longitude" in key or key in {"lon", "lng", "พิกัด lon"}: aliases[c] = "lon"
         elif "เวลา" in key or "time" in key or "date" in key: aliases[c] = "camera_time"
         elif "ด่าน" in key or "กล้อง" in key or "checkpoint" in key or "camera" in key: aliases[c] = "checkpoint"
     data = df.rename(columns=aliases)
@@ -255,9 +257,10 @@ def prepare_camera(df, offset=0):
             checkpoint = raw_checkpoint.split("|", 1)[1].strip() if "|" in raw_checkpoint else raw_checkpoint
             direction = "เข้า กทม." if re.search(r"(?:_|\s)เข้า$", checkpoint, re.I) else ("ออกจาก กทม." if re.search(r"(?:_|\s)ออก$", checkpoint, re.I) else "")
             base = re.sub(r"(?:_|\s)(?:เข้า|ออก)$", "", checkpoint, flags=re.I).replace("_", " ").strip()
-            records.append(dict(camera_id=int(index)+1+offset, event_type="CAMERA", plate=clean(row.get("plate")),
+            records.append(dict(camera_id=int(index)+1+offset, event_type="CAMERA", source="กล้อง", plate=clean(row.get("plate")),
                                 province=clean(row.get("province")), checkpoint=base, direction=direction,
-                                camera_time=timestamp(clean(row.get("camera_time")))))
+                                camera_time=timestamp(clean(row.get("camera_time"))),
+                                lat=clean(row.get("lat")), lon=clean(row.get("lon"))))
         except (ValueError, TypeError) as exc:
             errors.append({"แถวข้อมูล": int(index)+1, "ปัญหา": str(exc)})
     return pd.DataFrame(records), pd.DataFrame(errors)
