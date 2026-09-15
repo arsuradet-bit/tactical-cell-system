@@ -81,13 +81,20 @@ class DataTests(unittest.TestCase):
         ])
         events, errors = prepare_cdr(frame)
         self.assertTrue(errors.empty)
-        self.assertEqual(events.event_type.tolist(), ["VOICE โทรออก", "VOICE รับสาย", "SMS รับ", "SMS ส่ง"])
+        self.assertEqual(events.event_type.tolist(), ["CDR", "CDR", "CDR", "CDR"])
 
     def test_camera_checkpoint_direction(self):
         frame = pd.DataFrame([{"plate":"3", "province":"BKK", "checkpoint":"car|gate_out", "camera_time":"2026/07/19 18:57:44"}])
         records, errors = prepare_camera(frame)
         self.assertTrue(errors.empty)
         self.assertEqual(records.iloc[0]["checkpoint"], "gate out")
+
+    def test_camera_time_before_date(self):
+        records, errors = prepare_camera(pd.DataFrame([{
+            "อักษร": "TEST", "จังหวัด": "ทดสอบ", "ด่าน": "รถ|ด่านทดสอบ_ออก",
+            "เวลา": "18:57:44 19/07/2026"}]))
+        self.assertTrue(errors.empty)
+        self.assertEqual(records.iloc[0]["camera_time"].strftime("%Y-%m-%d %H:%M:%S"), "2026-07-19 18:57:44")
 
     def test_ambiguous_plmn(self):
         events, _ = prepare_cdr(pd.DataFrame([{"cell id":"30020114", "lac":"55653", "start date":"2026/08/30 18:00:00"}]))

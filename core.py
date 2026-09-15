@@ -106,6 +106,10 @@ def timestamp(value):
     s = clean(value)
     if not s:
         raise ValueError("ไม่มีวันเวลา")
+    # Camera tables place the time before the day-first date.
+    time_first = re.fullmatch(r"(\d{1,2}:\d{2}(?::\d{2})?)\s+(\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4})", s)
+    if time_first:
+        s = time_first.group(2) + " " + time_first.group(1)
     # Accept ISO/G-Mon Y/M/D and Thai day-first dates, including Buddhist years.
     m = re.fullmatch(r"(\d{1,4})[/.-](\d{1,2})[/.-](\d{1,4})(?:[ T]+(\d{1,2}):(\d{2})(?::(\d{2})(?:\.\d+)?)?)?", s)
     if not m:

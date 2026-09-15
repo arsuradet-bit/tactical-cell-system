@@ -103,6 +103,16 @@ with st.sidebar:
     st.caption("● Cloud SQL พร้อมใช้งาน" if ready else "○ ตัวอย่างสังเคราะห์" if DEMO else "○ Cloud SQL ยังไม่พร้อม")
     st.button("ออกจากระบบ", on_click=logout, width="stretch")
 active_panel = {"🔎 ค้นหา LAC / CELL / xNBID": "search_panel", "📥 เพิ่มข้อมูล G-Mon": "survey_upload", "📞 วิเคราะห์ CDR": "cdr_panel", "🎥 กล้อง + CDR": "camera_panel", "🗺️ ค้นหาพื้นที่": "area_panel"}[workspace_menu]
+# Each workspace keeps its own result set; uploaded files stay session-only.
+previous_panel = st.session_state.get("result_panel")
+if previous_panel != active_panel:
+    if previous_panel:
+        st.session_state["result_" + previous_panel] = {k: st.session_state[k] for k in ("rows", "mode", "notice", "elapsed")}
+    st.session_state.update(st.session_state.get("result_" + active_panel, dict(rows=[], mode="ค้นหา", notice="", elapsed=None)))
+    st.session_state.result_panel = active_panel
+    st.session_state.revision += 1
+camera_focus_rows = None
+camera_focus_key = "all"
 # Keep upload widgets mounted when navigating, so session-only files survive.
 hidden_panels = [name for name in ("search_panel", "survey_upload", "cdr_panel", "camera_panel", "area_panel") if name != active_panel]
 st.markdown("<style>" + ",".join(".st-key-" + name for name in hidden_panels) + "{display:none}</style>", unsafe_allow_html=True)
@@ -288,6 +298,7 @@ with st.container(key="camera_panel"):
             except Exception:
                 pass
             st.session_state.camera_rows = cameras
+            st.session_state.camera_generation = st.session_state.get("camera_generation", 0) + 1
             st.session_state.camera_errors = camera_errors
             st.session_state.camera_map_rows = [
                 {**r, "observed_at": r.get("camera_time"), "source": "กล้อง", "xci": None, "lac": None, "xnbid": None}
@@ -300,18 +311,30 @@ with st.container(key="camera_panel"):
         except Exception as exc:
             st.error(f"อ่านไฟล์กล้องไม่สำเร็จ: {exc}")
     cameras = st.session_state.get("camera_rows", pd.DataFrame())
-    if not cameras.empty:
+    camera_issues = st.session_state.get("camera_errors", pd.DataFrame())
+    if active_panel == "camera_panel" and not camera_issues.empty:
+        st.warning("มีรายการกล้องที่อ่านไม่ได้ กรุณาตรวจแถวและเวลาต่อไปนี้")
+        st.dataframe(camera_issues, hide_index=True)
+    if not cameras.empty and active_panel == "camera_panel":
         st.dataframe(cameras.assign(camera_time=cameras.camera_time.map(display_time)), hide_index=True, width="stretch")
         cdr_events = [r for r in st.session_state.get("camera_cdr_rows", []) if r.get("event_at") and r.get("event_type") != "CAMERA"]
         if cdr_events:
-            timeline = []
+            timeline, unmatched, focus_groups = [], [], []
+            matched_cameras = 0
             matched_ids = set()
             for cam in cameras.to_dict("records"):
                 nearby = [r for r in cdr_events if abs((r["event_at"] - cam["camera_time"]).total_seconds()) <= camera_window*60]
                 # Prefer VOICE at the same window; DATA fills windows with no call.
                 voice = [r for r in nearby if str(r.get("event_type", "")).startswith("VOICE")]
                 selected = voice or [r for r in nearby if r.get("cdr_kind") in {"DATA", "SMS"}]
+                if selected:
+                    matched_cameras += 1
+                else:
+                    unmatched.append({"เวลา": cam["camera_time"], "ทะเบียน": cam.get("plate"), "ด่าน": cam["checkpoint"], "เหตุผล": "ไม่พบ CDR ในช่วงเวลา"})
+                if not coordinates(cam.get("lat"), cam.get("lon")):
+                    unmatched.append({"เวลา": cam["camera_time"], "ทะเบียน": cam.get("plate"), "ด่าน": cam["checkpoint"], "เหตุผล": "ด่านไม่มีพิกัด"})
                 for r in selected:
+                    focus_groups.append((cam, r["event_id"]))
                     matched_ids.add(r.get("event_id"))
                     timeline.append({"เวลา": cam["camera_time"], "ทะเบียน": cam.get("plate"), "จังหวัด": cam.get("province"), "กล้อง/ด่าน": cam["checkpoint"],
                                      "ทิศทาง": cam["direction"], "ประเภท": r.get("event_type"),
@@ -321,18 +344,40 @@ with st.container(key="camera_panel"):
                                      "ละติจูดกล้อง": cam.get("lat"), "ลองจิจูดกล้อง": cam.get("lon"),
                                      "ละติจูด CDR/G-Mon": r.get("lat"), "ลองจิจูด CDR/G-Mon": r.get("lon"),
                                      "แหล่งพิกัด": r.get("source"), "สถานะ": "เวลาใกล้เคียง ไม่ยืนยันการผ่านกล้อง"})
-            if timeline:
+            for event_id in dict.fromkeys(r["event_id"] for r in cdr_events):
+                if event_id not in matched_ids:
+                    event = next(r for r in cdr_events if r["event_id"] == event_id)
+                    unmatched.append({"เวลา": event["event_at"], "ประเภท": event.get("cdr_kind"), "LAC": event.get("lac"), "CELL": event.get("xci"), "เหตุผล": "ไม่ถูกเลือกจับคู่ (นอกช่วงเวลาหรือ VOICE มีลำดับก่อน DATA)"})
+            summary_cols = st.columns(3)
+            summary_cols[0].metric("กล้องที่มี CDR ใกล้เวลา", matched_cameras)
+            summary_cols[1].metric("กล้องที่ไม่พบ CDR", len(cameras)-matched_cameras)
+            summary_cols[2].metric("รายการกล้องไม่มีพิกัด", sum(not coordinates(r.get("lat"),r.get("lon")) for r in cameras.to_dict("records")))
+            if timeline or unmatched:
                 # Keep the matched CDR rows available to the map renderer on this run.
                 st.session_state.rows = [
                     {**row, "camera_match": row.get("event_id") in matched_ids}
-                    for row in st.session_state.get("rows", [])
+                    for row in cdr_events
                 ]
-                st.success(f"พบเหตุการณ์ใกล้เวลากล้อง {len(timeline):,} รายการ")
-                timeline_table = pd.DataFrame(timeline).sort_values(["เวลา", "เวลา CDR"], kind="stable")
-                st.dataframe(timeline_table, hide_index=True, width="stretch")
+                st.success(f"CDR ที่ถูกเลือก {len(matched_ids):,} เหตุการณ์ · รายการจับคู่พิกัด {len(timeline):,} แถว")
+                timeline_table = pd.DataFrame(timeline)
+                if not timeline_table.empty:
+                    timeline_table = timeline_table.sort_values(["เวลา", "เวลา CDR"], kind="stable")
+                if not timeline_table.empty:
+                    selection = st.dataframe(timeline_table, hide_index=True, width="stretch", on_select="rerun", selection_mode="single-row", key=f"camera_timeline_{st.session_state.get('camera_generation', 0)}_{camera_window}_{len(timeline)}")
+                    if selection.selection.rows:
+                        original_index = timeline_table.index[selection.selection.rows[0]]
+                        selected_cam, selected_event = focus_groups[original_index]
+                        camera_focus_key = f"{selected_cam.get('camera_id')}_{selected_event}"
+                        camera_focus_rows = [r for r in cdr_events if r["event_id"] == selected_event] + [{**selected_cam, "event_type":"CAMERA", "source":"กล้อง"}]
+                        st.caption("แผนที่แสดงกล้องและทุกพิกัดของเหตุการณ์ที่เลือก · ยกเลิกการเลือกแถวเพื่อแสดงทั้งหมด")
+                if unmatched:
+                    with st.expander("รายการที่ต้องตรวจต่อ"):
+                        st.dataframe(pd.DataFrame(unmatched), hide_index=True)
+
                 excel_buffer = BytesIO()
                 with pd.ExcelWriter(excel_buffer, engine="openpyxl", datetime_format="DD/MM/YYYY HH:MM:SS") as writer:
                     timeline_table.to_excel(writer, sheet_name="ไทม์ไลน์จับคู่", index=False)
+                    pd.DataFrame(unmatched, columns=["เวลา", "ทะเบียน", "ด่าน", "ประเภท", "LAC", "CELL", "เหตุผล"]).to_excel(writer, sheet_name="รายการที่ต้องตรวจต่อ", index=False)
                     pd.DataFrame({"เงื่อนไข": ["ช่วงเวลารอบกล้อง (นาที)", "การเลือกประเภท", "ความหมายผลลัพธ์"],
                                   "ค่า": [str(camera_window), "VOICE ก่อน DATA ในช่วงเวลาที่เลือก", "จับคู่ตามเวลา ไม่ยืนยันตำแหน่งโทรศัพท์หรือการผ่านกล้อง"]}).to_excel(writer, sheet_name="เงื่อนไข", index=False)
                     from openpyxl.styles import Font, PatternFill
@@ -379,7 +424,8 @@ with st.container(key="area_panel"):
             st.error("ค้นหาพื้นที่ไม่สำเร็จ กรุณาตรวจการเชื่อมต่อ")
 
 rows = st.session_state.rows
-rows = rows + st.session_state.get("camera_map_rows", [])
+if active_panel == "camera_panel":
+    rows = camera_focus_rows if camera_focus_rows is not None else rows + st.session_state.get("camera_map_rows", [])
 if st.session_state.notice:
     st.success(st.session_state.notice)
 valid = [r for r in rows if coordinates(r.get("lat"),r.get("lon"))]
@@ -413,7 +459,7 @@ timeline_enabled = playback and st.session_state.mode == "CDR" and len(rows) <= 
 if playback and st.session_state.mode == "CDR" and len(rows) > 2000:
     st.info("ผลลัพธ์มีจำนวนมาก จึงแสดงจุดทั้งหมดบนแผนที่และปิดตัวควบคุมไทม์ไลน์ชั่วคราวเพื่อความเสถียร")
 map_obj = build_map(rows,sector=sector,bearing=bearing,radius=radius,beam=beam,path=timeline_enabled)
-st_folium(map_obj,height=620,use_container_width=True,key=f"map_{st.session_state.revision}",returned_objects=[])
+st_folium(map_obj,height=620,use_container_width=True,key=f"map_{st.session_state.revision}_{camera_focus_key}",returned_objects=[])
 st.caption("จุด G-Mon คือจุดตรวจพบสัญญาณ ไม่ใช่ตำแหน่งเสาจริง · ไทม์ไลน์เน้นทุกจุดของเหตุการณ์โดยไม่เลือกตำแหน่งโทรศัพท์เอง")
 if st.session_state.elapsed is not None:
     st.caption(f"ค้นหาฐานข้อมูล {st.session_state.elapsed:.2f} วินาที")

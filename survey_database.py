@@ -17,35 +17,22 @@ def normalized(expression):
 SOURCE = """WITH raw_rows AS (
  SELECT 'legacy:' || g.ctid::text AS observation_key, to_jsonb(g) AS raw FROM gmon_survey_logs g
  UNION ALL SELECT 'upload:' || id::text, raw FROM intel_gmon_uploads
-), observations AS (SELECT observation_key,raw,
+), observations AS MATERIALIZED (SELECT observation_key,raw,
 """ + ",".join(normalized(expr) + " AS " + name for name, expr in [
     ("xci", "raw->>'xci'"), ("lac", "coalesce(raw->>'lac/tac',raw->>'lac_tac')"),
     ("xnbid", "raw->>'xnbid'"), ("plmn", "raw->>'plmn'")]) + " FROM raw_rows) "
 
 SOURCE_UPLOAD = """WITH raw_rows AS (
  SELECT 'upload:' || id::text AS observation_key, raw FROM intel_gmon_uploads
-), observations AS (SELECT observation_key,raw,
+), observations AS MATERIALIZED (SELECT observation_key,raw,
 """ + ",".join(normalized(expr) + " AS " + name for name, expr in [
     ("xci", "raw->>'xci'"), ("lac", "coalesce(raw->>'lac/tac',raw->>'lac_tac')"),
     ("xnbid", "raw->>'xnbid'"), ("plmn", "raw->>'plmn'")]) + " FROM raw_rows) "
 
 
-# Fast path for migrated, indexed observations; raw uploads remain supported.
-SOURCE_FAST = """WITH raw_uploads AS (
- SELECT 'upload:' || id::text AS observation_key, raw FROM intel_gmon_uploads
-), uploads AS (SELECT observation_key,raw,
-""" + ",".join(normalized(expr) + " AS " + name for name, expr in [
-    ("xci", "raw->>'xci'"), ("lac", "coalesce(raw->>'lac/tac',raw->>'lac_tac')"),
-    ("xnbid", "raw->>'xnbid'"), ("plmn", "raw->>'plmn'")]) + """ FROM raw_uploads), observations AS (
- SELECT 'obs:' || id::text AS observation_key, raw, xci, lac, xnbid, plmn FROM intel_gmon_observations
- UNION ALL SELECT observation_key, raw, xci, lac, xnbid, plmn FROM uploads
-) """
-
+# Always read original rows; the migrated table has deduplicated records.
 def _source(engine):
     with engine.connect() as conn:
-        normalized_count = conn.execute(text("SELECT CASE WHEN to_regclass('public.intel_gmon_observations') IS NULL THEN 0 ELSE (SELECT count(*) FROM intel_gmon_observations) END")).scalar()
-        if normalized_count:
-            return SOURCE_FAST
         legacy = bool(conn.execute(text("SELECT to_regclass('public.gmon_survey_logs') IS NOT NULL")).scalar())
     return SOURCE if legacy else SOURCE_UPLOAD
 
@@ -93,6 +80,7 @@ def search(engine, cells=(), lacs=(), nbids=(), plmns=(), bounds=None, limit=Non
         params["limit"] = limit
     statement = text(_source(engine) + "SELECT * FROM observations WHERE " + " AND ".join(clauses) + suffix).bindparams(*bindings)
     with engine.connect() as conn:
+        conn.execute(text("SET LOCAL statement_timeout = 0"))
         rows = [materialize(r) for r in conn.execute(statement, params).mappings()]
     return rows, False
 
