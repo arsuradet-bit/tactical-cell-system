@@ -116,14 +116,18 @@ camera_focus_key = "all"
 # Keep upload widgets mounted when navigating, so session-only files survive.
 hidden_panels = [name for name in ("search_panel", "survey_upload", "cdr_panel", "camera_panel", "area_panel") if name != active_panel]
 st.markdown("<style>" + ",".join(".st-key-" + name for name in hidden_panels) + "{display:none}</style>", unsafe_allow_html=True)
-st.markdown("## " + workspace_menu)
+st.markdown('<div class="workspace-heading"><div><div class="eyebrow">FIELD WORKSPACE</div><h2>' + workspace_menu + '</h2><p>ค้นหา เชื่อมโยง และตรวจสอบเหตุการณ์บนแผนที่</p></div><span class="workspace-badge">พื้นที่วิเคราะห์</span></div>', unsafe_allow_html=True)
+control_column, map_column = st.columns([1.2, 2], gap="medium")
+controls = control_column.container(key="workflow_controls")
+map_area = map_column.container(key="map_workspace")
+report_area = st.container(key="timeline_workspace")
 if DEMO:
     st.info("ข้อมูลสังเคราะห์สำหรับทดสอบ · ไม่บันทึกฐานข้อมูล")
 elif not ready:
     st.warning("ยังค้นหาหรือเพิ่มข้อมูลไม่ได้ กรุณาตรวจการเชื่อมต่อและติดตั้ง schema_all_points.sql")
 
 # Upload is visible near the top, not hidden in an expander.
-with st.container(border=True, key="survey_upload"):
+with controls.container(border=True, key="survey_upload"):
     st.markdown("### 📥 อัปโหลดข้อมูล G-Mon Pro")
     st.caption("ทุกคนเพิ่มข้อมูลได้ · เก็บทุกแถวรวมรายการซ้ำ · ไม่จำกัดจำนวนแถว")
     upload = st.file_uploader("เลือกไฟล์ G-Mon Pro", type=["csv", "txt"], key="gmon_upload")
@@ -154,7 +158,7 @@ def demo_rows():
                  lon=100.47+i*.001, rsrp=[-82,-98,-112,-88,-102][i], observed_at=datetime(2025,9,3,9,11,i)) for i in range(5)]
 
 
-with st.container(border=True, key="search_panel"):
+with controls.container(border=True, key="search_panel"):
     st.markdown("### 🔎 ค้นหาพิกัดภาคสนาม")
     with st.form("search"):
         a, b, c = st.columns(3)
@@ -187,7 +191,7 @@ with st.container(border=True, key="search_panel"):
         except Exception:
             st.error("ค้นหาไม่สำเร็จ กรุณาตรวจการเชื่อมต่อแล้วลองใหม่")
 
-with st.container(key="cdr_panel"):
+with controls.container(key="cdr_panel"):
     st.caption("VOICE / DATA · ใช้ชั่วคราว")
     st.caption("จับคู่ทุกพิกัด G-Mon ด้วย LAC/CELL · ใช้พิกัด CDR เมื่อไม่พบ G-Mon · ไม่บันทึก CDR ลงฐานข้อมูล")
     a, b = st.columns(2)
@@ -246,14 +250,18 @@ with st.container(key="cdr_panel"):
     if not st.session_state.get("cdr_errors",pd.DataFrame()).empty:
         st.dataframe(st.session_state.cdr_errors,hide_index=True)
 
-with st.container(key="camera_panel"):
+with controls.container(key="camera_panel"):
+    st.markdown("### ① เลือกไฟล์")
+    st.caption("ใช้ VOICE หรือ DATA อย่างน้อยหนึ่งไฟล์ พร้อมตารางกล้อง")
     cv, cd = st.columns(2)
     camera_voice = cv.file_uploader("ไฟล์ VOICE สำหรับเทียบกล้อง", type=["csv", "txt", "xlsx"], key="camera_voice")
     camera_data = cd.file_uploader("ไฟล์ DATA สำหรับเทียบกล้อง", type=["csv", "txt", "xlsx"], key="camera_data")
     camera_network = st.selectbox("เครือข่าย CDR สำหรับเทียบกล้อง", ["ไม่ระบุ"] + list(NETWORKS), format_func=network_label, key="camera_network")
     st.caption("อัปโหลดข้อมูลกล้องเพื่อเทียบเวลาเหตุการณ์ CDR · ชื่อด่านใช้ข้อความหลัง | · ไฟล์กล้องไม่ถูกบันทึกลงฐานข้อมูล")
     camera_file = st.file_uploader("ไฟล์กล้อง/ด่าน (CSV, XLSX)", type=["csv","txt","xlsx"], key="camera_file")
-    camera_window = st.number_input("ช่วงเวลายอมรับรอบเหตุการณ์ (นาที)", min_value=1, max_value=240, value=10)
+    st.markdown("### ② กำหนดช่วงเวลา")
+    camera_window = st.number_input("ก่อนและหลังเวลากล้อง (นาที)", min_value=1, max_value=240, value=10)
+    st.caption("เช่น 10 นาที: กล้องเวลา 10:00 จะเทียบ CDR ตั้งแต่ 09:50 ถึง 10:10")
     camera_run = st.button("จับคู่กล้องกับ CDR", type="primary", disabled=not (camera_file and (camera_voice or camera_data) and (ready or DEMO)))
     if camera_run and camera_file:
         try:
@@ -313,10 +321,13 @@ with st.container(key="camera_panel"):
     cameras = st.session_state.get("camera_rows", pd.DataFrame())
     camera_issues = st.session_state.get("camera_errors", pd.DataFrame())
     if active_panel == "camera_panel" and not camera_issues.empty:
-        st.warning("มีรายการกล้องที่อ่านไม่ได้ กรุณาตรวจแถวและเวลาต่อไปนี้")
-        st.dataframe(camera_issues, hide_index=True)
+        report_area.warning("มีรายการกล้องที่อ่านไม่ได้ กรุณาตรวจแถวและเวลาต่อไปนี้")
+        report_area.dataframe(camera_issues, hide_index=True)
     if not cameras.empty and active_panel == "camera_panel":
-        st.dataframe(cameras.assign(camera_time=cameras.camera_time.map(display_time)), hide_index=True, width="stretch")
+        report_area.markdown("### ③ ผลวิเคราะห์และไทม์ไลน์")
+        report_area.caption("เลือกช่องหน้าแถวเพื่อแสดงกล้องและทุกจุดของเหตุการณ์บนแผนที่")
+        with report_area.expander("ดูรายการกล้องที่นำเข้า"):
+            st.dataframe(cameras.assign(camera_time=cameras.camera_time.map(display_time)), hide_index=True, width="stretch")
         cdr_events = [r for r in st.session_state.get("camera_cdr_rows", []) if r.get("event_at") and r.get("event_type") != "CAMERA"]
         if cdr_events:
             timeline, unmatched, focus_groups = [], [], []
@@ -348,7 +359,7 @@ with st.container(key="camera_panel"):
                 if event_id not in matched_ids:
                     event = next(r for r in cdr_events if r["event_id"] == event_id)
                     unmatched.append({"เวลา": event["event_at"], "ประเภท": event.get("cdr_kind"), "LAC": event.get("lac"), "CELL": event.get("xci"), "เหตุผล": "ไม่ถูกเลือกจับคู่ (นอกช่วงเวลาหรือ VOICE มีลำดับก่อน DATA)"})
-            summary_cols = st.columns(3)
+            summary_cols = report_area.columns(3)
             summary_cols[0].metric("กล้องที่มี CDR ใกล้เวลา", matched_cameras)
             summary_cols[1].metric("กล้องที่ไม่พบ CDR", len(cameras)-matched_cameras)
             summary_cols[2].metric("รายการกล้องไม่มีพิกัด", sum(not coordinates(r.get("lat"),r.get("lon")) for r in cameras.to_dict("records")))
@@ -358,21 +369,21 @@ with st.container(key="camera_panel"):
                     {**row, "camera_match": row.get("event_id") in matched_ids}
                     for row in cdr_events
                 ]
-                st.success(f"CDR ที่ถูกเลือก {len(matched_ids):,} เหตุการณ์ · รายการจับคู่พิกัด {len(timeline):,} แถว")
+                report_area.success(f"CDR ที่ถูกเลือก {len(matched_ids):,} เหตุการณ์ · รายการจับคู่พิกัด {len(timeline):,} แถว")
                 timeline_table = pd.DataFrame(timeline)
                 if not timeline_table.empty:
                     timeline_table = timeline_table.sort_values(["เวลา", "เวลา CDR"], kind="stable")
                 if not timeline_table.empty:
-                    selection = st.dataframe(timeline_table, hide_index=True, width="stretch", on_select="rerun", selection_mode="single-row", key=f"camera_timeline_{st.session_state.get('camera_generation', 0)}_{camera_window}_{len(timeline)}")
+                    selection = report_area.dataframe(timeline_table, hide_index=True, width="stretch", on_select="rerun", selection_mode="single-row", key=f"camera_timeline_{st.session_state.get('camera_generation', 0)}_{camera_window}_{len(timeline)}")
                     if selection.selection.rows:
                         original_index = timeline_table.index[selection.selection.rows[0]]
                         selected_cam, selected_event = focus_groups[original_index]
                         camera_focus_key = f"{selected_cam.get('camera_id')}_{selected_event}"
                         camera_focus_rows = [r for r in cdr_events if r["event_id"] == selected_event] + [{**selected_cam, "event_type":"CAMERA", "source":"กล้อง"}]
-                        st.caption("แผนที่แสดงกล้องและทุกพิกัดของเหตุการณ์ที่เลือก · ยกเลิกการเลือกแถวเพื่อแสดงทั้งหมด")
+                        report_area.caption("แผนที่แสดงกล้องและทุกพิกัดของเหตุการณ์ที่เลือก · ยกเลิกการเลือกแถวเพื่อแสดงทั้งหมด")
                 if unmatched:
-                    with st.expander("รายการที่ต้องตรวจต่อ"):
-                        st.dataframe(pd.DataFrame(unmatched), hide_index=True)
+                    with report_area.expander("รายการที่ต้องตรวจต่อ"):
+                        report_area.dataframe(pd.DataFrame(unmatched), hide_index=True)
 
                 excel_buffer = BytesIO()
                 with pd.ExcelWriter(excel_buffer, engine="openpyxl", datetime_format="DD/MM/YYYY HH:MM:SS") as writer:
@@ -395,15 +406,15 @@ with st.container(key="camera_panel"):
                                     cell.data_type = "s"
                                 elif isinstance(cell.value, datetime):
                                     cell.number_format = "dd/mm/yyyy hh:mm:ss"
-                st.download_button("📥 ส่งออกไทม์ไลน์ Excel", data=excel_buffer.getvalue(),
+                report_area.download_button("📥 ส่งออกไทม์ไลน์ Excel", data=excel_buffer.getvalue(),
                                    file_name="camera_cdr_timeline.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                                    key="export_camera_timeline")
             else:
-                st.warning("ไม่พบ CDR ในช่วงเวลาที่กำหนดรอบกล้อง")
+                report_area.warning("ไม่พบ CDR ในช่วงเวลาที่กำหนดรอบกล้อง")
         else:
             st.info("เลือกไฟล์ VOICE หรือ DATA และไฟล์กล้องในเมนูนี้ แล้วกดจับคู่กล้องกับ CDR")
 
-with st.container(key="area_panel"):
+with controls.container(key="area_panel"):
     with st.form("area"):
         a,b = st.columns(2)
         south = a.number_input("ใต้",-90.,90.,6.9,format="%.5f")
@@ -426,45 +437,45 @@ with st.container(key="area_panel"):
 rows = st.session_state.rows
 if active_panel == "camera_panel":
     rows = camera_focus_rows if camera_focus_rows is not None else rows + st.session_state.get("camera_map_rows", [])
-if st.session_state.notice:
-    st.success(st.session_state.notice)
-valid = [r for r in rows if coordinates(r.get("lat"),r.get("lon"))]
-metrics = st.columns(4)
-metrics[0].metric("รายการพิกัด",f"{len(valid):,}")
-metrics[1].metric("G-Mon",f"{sum(r.get('source','G-Mon')=='G-Mon' for r in valid):,}")
-metrics[2].metric("CDR สำรอง",f"{sum(r.get('source')=='CDR สำรอง' for r in valid):,}")
-metrics[3].metric("ไม่มีพิกัด",f"{len(rows)-len(valid):,}")
-st.markdown("### 🗺️ แผนที่วิเคราะห์")
-st.caption("🟢 HIGH ≥ −90 · 🟡 MID ≥ −105 · 🔴 LOW < −105 dBm — ใช้กับ LTE RSRP · เทา = ไม่มีค่า/ระบบอื่น")
-st.caption("เก็บทุกรายการ จุดพิกัดเดียวกันอาจซ้อนกัน เปิดตารางเพื่อดูรายละเอียดครบทุกแถว")
-with st.expander("ตั้งค่าการแสดงผลแผนที่"):
-    playback = st.checkbox("เล่นไทม์ไลน์แบบเน้นกลุ่มจุด",value=True,disabled=st.session_state.mode != "CDR")
-    sector = st.checkbox("เปิด Sector จำลอง")
-    a,b,c = st.columns(3)
-    bearing_text = a.text_input("ทิศจำลอง (0–359°)",placeholder="เช่น 90")
-    radius = b.number_input("รัศมีจำลอง (เมตร)",10,20000,1000,100)
-    beam = c.number_input("ความกว้าง (องศา)",1,360,90)
-    bearing = None
-    if bearing_text.strip():
-        try:
-            bearing = float(bearing_text)
-            if not 0<=bearing<360:
-                raise ValueError()
-        except ValueError:
-            bearing = None
-            st.warning("ทิศต้องตั้งแต่ 0 ถึงน้อยกว่า 360 องศา")
-    if sector and (bearing is None or len(valid)>500):
-        st.info("กรอกทิศจำลอง และค้นหาไม่เกิน 500 จุดเพื่อเปิดรูปพัด")
-timeline_enabled = playback and st.session_state.mode == "CDR" and len(rows) <= 2000
-if playback and st.session_state.mode == "CDR" and len(rows) > 2000:
-    st.info("ผลลัพธ์มีจำนวนมาก จึงแสดงจุดทั้งหมดบนแผนที่และปิดตัวควบคุมไทม์ไลน์ชั่วคราวเพื่อความเสถียร")
-map_obj = build_map(rows,sector=sector,bearing=bearing,radius=radius,beam=beam,path=timeline_enabled)
-st_folium(map_obj,height=620,use_container_width=True,key=f"map_{st.session_state.revision}_{camera_focus_key}",returned_objects=[])
-st.caption("จุด G-Mon คือจุดตรวจพบสัญญาณ ไม่ใช่ตำแหน่งเสาจริง · ไทม์ไลน์เน้นทุกจุดของเหตุการณ์โดยไม่เลือกตำแหน่งโทรศัพท์เอง")
-if st.session_state.elapsed is not None:
-    st.caption(f"ค้นหาฐานข้อมูล {st.session_state.elapsed:.2f} วินาที")
-if any(r.get("ambiguous") for r in rows):
-    st.warning("มีหลาย PLMN ตรงกับ LAC/CELL เดียวกัน แสดงทุกเครือข่าย กรุณาเลือกเครือข่ายเพื่อจำกัดผล")
+with map_area:
+    if st.session_state.notice:
+        st.success(st.session_state.notice)
+    valid = [r for r in rows if coordinates(r.get("lat"),r.get("lon"))]
+    totals = [("พิกัดทั้งหมด", len(valid)), ("G-Mon", sum(r.get('source','G-Mon')=='G-Mon' for r in valid)),
+              ("CDR สำรอง", sum(r.get('source')=='CDR สำรอง' for r in valid)), ("ไม่มีพิกัด", len(rows)-len(valid))]
+    st.markdown('<div class="result-strip">' + ''.join(f'<div><span>{label}</span><strong>{value:,}</strong></div>' for label,value in totals) + '</div>', unsafe_allow_html=True)
+    st.markdown("### 🗺️ แผนที่วิเคราะห์")
+    st.caption("📞 VOICE · 📡 DATA · 📷 กล้อง" if active_panel in {"cdr_panel", "camera_panel"} else "🟢 สัญญาณดี · 🟡 ปานกลาง · 🔴 อ่อน · ⚪ ไม่มีเกณฑ์")
+    with controls.expander("⚙️ ตัวเลือกแผนที่และคำอธิบาย"):
+        st.caption("LTE RSRP: เขียว ≥ −90 · เหลือง ≥ −105 · แดง < −105 dBm · เก็บข้อมูลทุกแถว จุดพิกัดเดียวกันอาจซ้อนกัน")
+        playback = st.checkbox("เล่นไทม์ไลน์แบบเน้นกลุ่มจุด",value=True,disabled=st.session_state.mode != "CDR")
+        sector = st.checkbox("เปิด Sector จำลอง")
+        a,b,c = st.columns(3)
+        bearing_text = a.text_input("ทิศจำลอง (0–359°)",placeholder="เช่น 90")
+        radius = b.number_input("รัศมีจำลอง (เมตร)",10,20000,1000,100)
+        beam = c.number_input("ความกว้าง (องศา)",1,360,90)
+        bearing = None
+        if bearing_text.strip():
+            try:
+                bearing = float(bearing_text)
+                if not 0<=bearing<360:
+                    raise ValueError()
+            except ValueError:
+                bearing = None
+                st.warning("ทิศต้องตั้งแต่ 0 ถึงน้อยกว่า 360 องศา")
+        if sector and (bearing is None or len(valid)>500):
+            st.info("กรอกทิศจำลอง และค้นหาไม่เกิน 500 จุดเพื่อเปิดรูปพัด")
+    timeline_enabled = playback and st.session_state.mode == "CDR" and len(rows) <= 2000
+    if playback and st.session_state.mode == "CDR" and len(rows) > 2000:
+        st.info("ผลลัพธ์มีจำนวนมาก จึงแสดงจุดทั้งหมดบนแผนที่และปิดตัวควบคุมไทม์ไลน์ชั่วคราวเพื่อความเสถียร")
+    map_obj = build_map(rows,sector=sector,bearing=bearing,radius=radius,beam=beam,path=timeline_enabled)
+    st_folium(map_obj,height=620,use_container_width=True,key=f"map_{st.session_state.revision}_{camera_focus_key}",returned_objects=[])
+    st.caption("จุด G-Mon คือจุดตรวจพบสัญญาณ ไม่ใช่ตำแหน่งเสาจริง · ไทม์ไลน์เน้นทุกจุดของเหตุการณ์โดยไม่เลือกตำแหน่งโทรศัพท์เอง")
+    if st.session_state.elapsed is not None:
+        st.caption(f"ค้นหาฐานข้อมูล {st.session_state.elapsed:.2f} วินาที")
+    if any(r.get("ambiguous") for r in rows):
+        st.warning("มีหลาย PLMN ตรงกับ LAC/CELL เดียวกัน แสดงทุกเครือข่าย กรุณาเลือกเครือข่ายเพื่อจำกัดผล")
+
 if rows:
     with st.expander("ตารางผลทั้งหมด · รวมรายการซ้ำ"):
         table = pd.DataFrame(rows)

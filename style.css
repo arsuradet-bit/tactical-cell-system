@@ -42,3 +42,54 @@ textarea { font-variant-numeric:tabular-nums;line-height:1.7!important; }
 [data-testid="stSidebar"] [role="radiogroup"] label:hover { background:#1c3048; }
 @media(max-width:700px) { [data-testid="stHorizontalBlock"] { flex-direction:column!important;gap:.75rem!important; } [data-testid="stColumn"] { width:100%!important;flex:1 1 100%!important;min-width:0!important; } .stButton button,.stFormSubmitButton button { width:100%;min-height:48px; } [data-testid="stMetric"] { margin:0;padding:12px; } }
 @media(max-width:800px) { .hero{padding:20px;display:block}.hero h1{font-size:23px}.hero-tag{border:0;padding:10px 0 0;margin:0}.brand{font-size:21px}.block-container{padding:4rem 1rem 1rem}.footer span{float:none;display:block}.section-title small{display:none} }
+
+/* Field workspace: controls alongside the map, timeline below both. */
+.stApp { background:radial-gradient(ellipse at 90% 0%,#14293b 0%,#0a1320 45%,#080f19 100%); }
+.block-container { max-width:1800px;padding:2.5rem 2rem 1.5rem; }
+.workspace-heading { display:flex;align-items:center;justify-content:space-between;gap:20px;margin:8px 0 26px;padding:0 0 20px;border-bottom:1px solid #253b4c; }
+.workspace-heading h2 { margin:3px 0;padding:0;font-size:27px;letter-spacing:-.4px; }
+.workspace-heading p { color:#9aafbf;margin:6px 0 0;font-size:14px; }
+.workspace-badge { border:1px solid #2b665f;background:#133730;color:#9be2d4;border-radius:24px;padding:8px 16px;font-size:12px;white-space:nowrap; }
+.st-key-workflow_controls { background:#111e2e;border:1px solid #2a3d50;border-radius:16px;padding:18px; }
+.st-key-workflow_controls h3 { font-size:18px;padding-top:0; }
+.st-key-workflow_controls [data-testid="stHorizontalBlock"] { flex-direction:column!important;flex-wrap:nowrap!important;height:auto!important;gap:10px!important; }
+.st-key-workflow_controls [data-testid="stColumn"] { width:100%!important;flex:0 0 auto!important;min-width:0!important; }
+.st-key-workflow_controls .st-key-survey_upload { padding:0;margin:0;background:transparent;border:0; }
+.st-key-workflow_controls .st-key-search_panel { border:0;padding:0; }
+.st-key-workflow_controls button { width:100%; }
+.st-key-workflow_controls textarea { min-height:90px; }
+.st-key-workflow_controls [data-testid="stFileUploaderDropzone"] { background:#0c1726;border-color:#385b70;padding:12px; }
+.st-key-workflow_controls button[kind="primary"] { background:#39c6be;color:#062c2b!important;box-shadow:0 3px 12px #0b383a;border:0; }
+.st-key-workflow_controls button[kind="primary"]:hover { background:#66dbd0; }
+.st-key-map_workspace { border:1px solid #293e50;background:#0f1b2a;border-radius:16px;padding:18px; }
+.st-key-map_workspace h3 { font-size:20px;padding-top:0; }
+.result-strip { display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;padding:0 0 14px;border-bottom:1px solid #263d50;margin-bottom:8px; }
+.result-strip div { padding:4px 6px; }
+.result-strip span { display:block;font-size:12px;color:#9bb3c2; }
+.result-strip strong { display:block;font-size:24px;color:#d9f7f0;line-height:1.5;font-variant-numeric:tabular-nums; }
+[data-testid="stMetric"] { margin:0 0 10px;padding:10px 12px;border-radius:10px;background:#132435;border-color:#2a4054; }
+[data-testid="stMetricValue"] { font-size:26px!important;line-height:1.35; }
+[data-testid="stMetricLabel"] { font-size:12px!important; }
+.st-key-map_workspace iframe { border-radius:12px; }
+.st-key-timeline_workspace { margin-top:26px; }
+.st-key-timeline_workspace h3 { color:#d8edea; }
+.stDownloadButton button { background:#174840;border:1px solid #3b9e8d;color:#c6fff2;min-height:44px; }
+[data-testid="stSidebar"] .brand { font-size:23px; }
+[data-testid="stSidebar"] [role="radiogroup"] label { width:100%; }
+@media(max-width:1100px) {
+ .block-container { padding:2rem 1rem; }
+ .block-container > [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"] { flex-wrap:wrap; }
+ .block-container > [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"] > [data-testid="stColumn"] { min-width:320px; }
+ /* The main workspace becomes a readable single column when the sidebar leaves
+    too little room for the control panel and map side by side. */
+ .block-container [data-testid="stHorizontalBlock"]:has(.st-key-workflow_controls) { flex-direction:column!important; flex-wrap:nowrap!important; }
+ .block-container [data-testid="stHorizontalBlock"]:has(.st-key-workflow_controls) > [data-testid="stColumn"] { width:100%!important; flex:0 0 auto!important; min-width:0!important; }
+}
+@media(max-width:700px) {
+ .result-strip { grid-template-columns:repeat(2,minmax(0,1fr)); }
+ .workspace-heading h2 { font-size:21px; }
+ .workspace-badge { display:none; }
+ .st-key-workflow_controls,.st-key-map_workspace { padding:12px; }
+ .st-key-map_workspace [data-testid="stHorizontalBlock"] { flex-direction:row!important;flex-wrap:wrap;gap:8px!important; }
+ .st-key-map_workspace [data-testid="stColumn"] { flex:1 1 40%!important;min-width:0!important;width:auto!important; }
+}
