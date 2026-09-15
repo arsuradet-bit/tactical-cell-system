@@ -129,7 +129,6 @@ elif not ready:
 # Upload is visible near the top, not hidden in an expander.
 with controls.container(border=True, key="survey_upload"):
     st.markdown("### 📥 อัปโหลดข้อมูล G-Mon Pro")
-    st.caption("ทุกคนเพิ่มข้อมูลได้ · เก็บทุกแถวรวมรายการซ้ำ · ไม่จำกัดจำนวนแถว")
     upload = st.file_uploader("เลือกไฟล์ G-Mon Pro", type=["csv", "txt"], key="gmon_upload")
     if upload:
         try:
