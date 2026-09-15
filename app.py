@@ -165,7 +165,6 @@ with controls.container(border=True, key="search_panel"):
         lacs = b.text_area("LAC / TAC", placeholder="55653\n55653\n06611", height=90, key="lac_input")
         nbids = c.text_area("xNBID", placeholder="116876\n117266", height=90, key="nbid_input")
         plmn = st.selectbox("เครือข่าย / PLMN", ["ทุกเครือข่าย"] + list(NETWORKS), format_func=network_label, key="plmn_input")
-        st.caption("CELL และ LAC จับคู่ตามบรรทัด · เว้นทั้งช่องเพื่อค้นหาอีกช่องอย่างเดียว · xNBID ใส่ได้หลายบรรทัด")
         search_button = st.form_submit_button("ค้นหาพิกัด", type="primary", width="stretch", disabled=not (ready or DEMO))
     st.button("ล้างการค้นหา", on_click=clear_search, width="stretch", key="clear_search_button")
     if search_button:
