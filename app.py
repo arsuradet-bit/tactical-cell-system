@@ -117,7 +117,7 @@ camera_focus_key = "all"
 hidden_panels = [name for name in ("search_panel", "survey_upload", "cdr_panel", "camera_panel", "area_panel") if name != active_panel]
 st.markdown("<style>" + ",".join(".st-key-" + name for name in hidden_panels) + "{display:none}</style>", unsafe_allow_html=True)
 st.markdown('<div class="workspace-heading"><div><div class="eyebrow">FIELD WORKSPACE</div><h2>' + workspace_menu + '</h2><p>ค้นหา เชื่อมโยง และตรวจสอบเหตุการณ์บนแผนที่</p></div><span class="workspace-badge">พื้นที่วิเคราะห์</span></div>', unsafe_allow_html=True)
-control_column, map_column = st.columns([1.2, 2], gap="medium")
+control_column, map_column = st.columns([1, 3], gap="small")
 controls = control_column.container(key="workflow_controls")
 map_area = map_column.container(key="map_workspace")
 report_area = st.container(key="timeline_workspace")
@@ -162,9 +162,9 @@ with controls.container(border=True, key="search_panel"):
     st.markdown("### 🔎 ค้นหาพิกัดภาคสนาม")
     with st.form("search"):
         a, b, c = st.columns(3)
-        cells = a.text_area("CELL / XCI", placeholder="117266\n116876\n64918", height=140, key="cell_input")
-        lacs = b.text_area("LAC / TAC", placeholder="55653\n55653\n06611", height=140, key="lac_input")
-        nbids = c.text_area("xNBID", placeholder="116876\n117266", height=140, key="nbid_input")
+        cells = a.text_area("CELL / XCI", placeholder="117266\n116876\n64918", height=90, key="cell_input")
+        lacs = b.text_area("LAC / TAC", placeholder="55653\n55653\n06611", height=90, key="lac_input")
+        nbids = c.text_area("xNBID", placeholder="116876\n117266", height=90, key="nbid_input")
         plmn = st.selectbox("เครือข่าย / PLMN", ["ทุกเครือข่าย"] + list(NETWORKS), format_func=network_label, key="plmn_input")
         st.caption("CELL และ LAC จับคู่ตามบรรทัด · เว้นทั้งช่องเพื่อค้นหาอีกช่องอย่างเดียว · xNBID ใส่ได้หลายบรรทัด")
         search_button = st.form_submit_button("ค้นหาพิกัด", type="primary", width="stretch", disabled=not (ready or DEMO))

@@ -50,7 +50,7 @@ textarea { font-variant-numeric:tabular-nums;line-height:1.7!important; }
 .workspace-heading h2 { margin:3px 0;padding:0;font-size:27px;letter-spacing:-.4px; }
 .workspace-heading p { color:#9aafbf;margin:6px 0 0;font-size:14px; }
 .workspace-badge { border:1px solid #2b665f;background:#133730;color:#9be2d4;border-radius:24px;padding:8px 16px;font-size:12px;white-space:nowrap; }
-.st-key-workflow_controls { background:#111e2e;border:1px solid #2a3d50;border-radius:16px;padding:18px; }
+.st-key-workflow_controls { background:#111e2e;border:1px solid #2a3d50;border-radius:16px;padding:12px; }
 .st-key-workflow_controls h3 { font-size:18px;padding-top:0; }
 .st-key-workflow_controls [data-testid="stHorizontalBlock"] { flex-direction:column!important;flex-wrap:nowrap!important;height:auto!important;gap:10px!important; }
 .st-key-workflow_controls [data-testid="stColumn"] { width:100%!important;flex:0 0 auto!important;min-width:0!important; }
@@ -58,10 +58,12 @@ textarea { font-variant-numeric:tabular-nums;line-height:1.7!important; }
 .st-key-workflow_controls .st-key-search_panel { border:0;padding:0; }
 .st-key-workflow_controls button { width:100%; }
 .st-key-workflow_controls textarea { min-height:90px; }
+.st-key-search_panel textarea { line-height:1.4!important;padding-top:8px;padding-bottom:8px; }
+.st-key-search_panel [data-testid="stVerticalBlock"] { gap:8px; }
 .st-key-workflow_controls [data-testid="stFileUploaderDropzone"] { background:#0c1726;border-color:#385b70;padding:12px; }
 .st-key-workflow_controls button[kind="primary"] { background:#39c6be;color:#062c2b!important;box-shadow:0 3px 12px #0b383a;border:0; }
 .st-key-workflow_controls button[kind="primary"]:hover { background:#66dbd0; }
-.st-key-map_workspace { border:1px solid #293e50;background:#0f1b2a;border-radius:16px;padding:18px; }
+.st-key-map_workspace { border:1px solid #293e50;background:#0f1b2a;border-radius:16px;padding:10px; }
 .st-key-map_workspace h3 { font-size:20px;padding-top:0; }
 .result-strip { display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;padding:0 0 14px;border-bottom:1px solid #263d50;margin-bottom:8px; }
 .result-strip div { padding:4px 6px; }
